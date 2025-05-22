@@ -9,20 +9,20 @@
 
 namespace ncore
 {
+    // IPAddress ...
+    struct IPAddress_t
+    {
+        byte A, B, C, D;
+    };
+
+    struct MACAddress_t
+    {
+        byte A, B, C, D, E, F;
+    };
+
     namespace nwifi
     {
         // @see: https://www.arduino.cc/en/Reference/WiFi
-
-        // IPAddress ...
-        struct IPAddress_t
-        {
-            byte A, B, C, D;
-        };
-
-        struct MACAddress_t
-        {
-            byte A, B, C, D, E, F;
-        };
 
         struct BSID_t
         {
