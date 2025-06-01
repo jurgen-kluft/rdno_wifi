@@ -5,18 +5,28 @@ import (
 	rdno_network "github.com/jurgen-kluft/rdno_network/package"
 )
 
-// rdno_wifi is the Wifi package for Arduino projects.
+// rdno_network is the Network core package for Arduino Esp32 projects.
+const (
+	repo_path = "github.com\\jurgen-kluft"
+	repo_name = "rdno_wifi"
+)
+
 func GetPackage() *denv.Package {
-	unetpkg := rdno_network.GetPackage()
+	name := repo_name
 
-	mainpkg := denv.NewPackage("rdno_wifi")
-	mainpkg.AddPackage(unetpkg)
+	// dependencies
+	networkpkg := rdno_network.GetPackage()
 
-	mainlib := denv.SetupCppLibProject("rdno_wifi", "github.com\\jurgen-kluft\\rdno_wifi")
+	// main package
+	mainpkg := denv.NewPackage(repo_path, repo_name)
+	mainpkg.AddPackage(networkpkg)
+
+	// main library
+	mainlib := denv.SetupCppLibProject(mainpkg, name)
 	mainlib.AddEnvironmentVariable("ESP_SDK")
-	mainlib.AddExternalInclude("{ESP_SDK}/libraries/WiFi/src")
-	mainlib.AddExternalSourcesFromForArduino("{ESP_SDK}/libraries/WiFi/src")
-	mainlib.AddDependencies(unetpkg.GetMainLib()...)
+	mainlib.AddInclude("{ESP_SDK}", "libraries/WiFi", "src")
+	mainlib.SourceFilesFrom("{ESP_SDK}", "libraries/WiFi", "src")
+	mainlib.AddDependencies(networkpkg.GetMainLib()...)
 
 	mainpkg.AddMainLib(mainlib)
 	return mainpkg

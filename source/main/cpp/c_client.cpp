@@ -6,103 +6,96 @@
 #    include "rdno_wifi/c_client.h"
 #    include "rdno_core/c_allocator.h"
 
+class WiFiClientInstance : public WiFiClient
+{
+public:
+    WiFiClientInstance() : WiFiClient() {}
+    virtual ~WiFiClientInstance() {}
+
+    DCORE_CLASS_PLACEMENT_NEW_DELETE
+};
+
 namespace ncore
 {
-    namespace nwifi
+    namespace nclient
     {
-        static WiFiClient **sWifiClients = nullptr;
-        static s16          sMaxClients  = 0;
-        static s16          sNumClients  = 0;
+        s16                 gNumClients = 0;
+        WiFiClientInstance *gWiFiClient[4];
 
-        void InitMaxClients(alloc_t *allocator, u16 max_clients)
+        s16 NewClient(alloc_t* allocator)
         {
-            sWifiClients = g_allocate_array_and_clear<WiFiClient *>(allocator, max_clients);
-            sMaxClients  = max_clients;
-            sNumClients  = 0;
+            gWiFiClient[gNumClients] = allocator->construct<WiFiClientInstance>();
+            gNumClients++;
+            return gNumClients - 1;
         }
 
-        s16 NewClient(alloc_t *allocator)
-        {
-            if (sNumClients >= sMaxClients)
-            {
-                if (sMaxClients == 0)
-                {
-                    InitMaxClients(allocator, 1);
-                    sMaxClients = 1;
-                }
-                else
-                {
-                    return -1;
-                }
-            }
-
-            s16 clientIndex           = sNumClients++;
-            sWifiClients[clientIndex] = g_allocate<WiFiClient>(allocator);
-            return clientIndex;
-        }
-
-        s32 Connect(s16 clientIndex, IPAddress_t _ip, u16 _port)
+        nstatus::status_t Connect(s16 clientIndex, IPAddress_t _ip, u16 _port)
         {
             IPAddress ip(_ip.A, _ip.B, _ip.C, _ip.D);
-            return sWifiClients[clientIndex]->connect(ip, _port);
+            return gWiFiClient[clientIndex]->connect(ip, _port) == 1 ? nstatus::Connected : nstatus::ConnectFailed;
         }
-        s32 Connect(s16 clientIndex, IPAddress_t _ip, u16 _port, s32 timeout_ms)
+        nstatus::status_t Connect(s16 clientIndex, IPAddress_t _ip, u16 _port, s32 timeout_ms)
         {
             IPAddress ip(_ip.A, _ip.B, _ip.C, _ip.D);
-            return sWifiClients[clientIndex]->connect(ip, _port, timeout_ms);
+            return gWiFiClient[clientIndex]->connect(ip, _port, timeout_ms) ? nstatus::Connected : nstatus::ConnectFailed;
         }
-        s32    Connect(s16 clientIndex, const char *host, u16 port) { return sWifiClients[clientIndex]->connect(host, port); }
-        s32    Connect(s16 clientIndex, const char *host, u16 port, s32 timeout_ms) { return sWifiClients[clientIndex]->connect(host, port, timeout_ms); }
-        uint_t Write(s16 clientIndex, u8 data) { return sWifiClients[clientIndex]->write(data); }
-        uint_t Write(s16 clientIndex, const u8 *buf, uint_t size) { return sWifiClients[clientIndex]->write(buf, size); }
+        nstatus::status_t Connect(s16 clientIndex, const char *host, u16 port) { return gWiFiClient[clientIndex]->connect(host, port) ? nstatus::Connected : nstatus::ConnectFailed; }
+        nstatus::status_t Connect(s16 clientIndex, const char *host, u16 port, s32 timeout_ms) { return gWiFiClient[clientIndex]->connect(host, port, timeout_ms) ? nstatus::Connected : nstatus::ConnectFailed; }
+        uint_t            Write(s16 clientIndex, u8 data) { return gWiFiClient[clientIndex]->write(data); }
+        uint_t            Write(s16 clientIndex, const u8 *buf, uint_t size) { return gWiFiClient[clientIndex]->write(buf, size); }
 
-        s32    Available(s16 clientIndex) { return sWifiClients[clientIndex]->available(); }
-        s32    Read(s16 clientIndex) { return sWifiClients[clientIndex]->read(); }
-        s32    Read(s16 clientIndex, u8 *buf, uint_t size) { return sWifiClients[clientIndex]->read(buf, size); }
-        uint_t ReadBytes(s16 clientIndex, char *buffer, uint_t length) { return sWifiClients[clientIndex]->readBytes(buffer, length); }
-        uint_t ReadBytes(s16 clientIndex, u8 *buffer, uint_t length) { return sWifiClients[clientIndex]->readBytes(buffer, length); }
-        s32    Peek(s16 clientIndex) { return sWifiClients[clientIndex]->peek(); }
-        void   Clear(s16 clientIndex) { sWifiClients[clientIndex]->clear(); }
-        void   Stop(s16 clientIndex) { sWifiClients[clientIndex]->stop(); }
-        u8     Connected(s16 clientIndex) { return sWifiClients[clientIndex]->connected(); }
-        void   SetSSE(s16 clientIndex, bool sse) { sWifiClients[clientIndex]->setSSE(sse); }
-        bool   IsSSE(s16 clientIndex) { return sWifiClients[clientIndex]->isSSE(); }
+        s32               Available(s16 clientIndex) { return gWiFiClient[clientIndex]->available(); }
+        s32               Read(s16 clientIndex) { return gWiFiClient[clientIndex]->read(); }
+        s32               Read(s16 clientIndex, u8 *buf, uint_t size) { return gWiFiClient[clientIndex]->read(buf, size); }
+        uint_t            ReadBytes(s16 clientIndex, char *buffer, uint_t length) { return gWiFiClient[clientIndex]->readBytes(buffer, length); }
+        uint_t            ReadBytes(s16 clientIndex, u8 *buffer, uint_t length) { return gWiFiClient[clientIndex]->readBytes(buffer, length); }
+        s32               Peek(s16 clientIndex) { return gWiFiClient[clientIndex]->peek(); }
+        void              Clear(s16 clientIndex) { gWiFiClient[clientIndex]->clear(); }
+        void              Stop(s16 clientIndex) { gWiFiClient[clientIndex]->stop(); }
+        nstatus::status_t Connected(s16 clientIndex)
+        {
+            if (gWiFiClient[clientIndex]->connected() == true)
+                return nstatus::Connected;
+            return nstatus::Disconnected;
+        }
+        void SetSSE(s16 clientIndex, bool sse) { gWiFiClient[clientIndex]->setSSE(sse); }
+        bool IsSSE(s16 clientIndex) { return gWiFiClient[clientIndex]->isSSE(); }
 
-        s32  SetSocketOption(s16 clientIndex, s32 option, char *value, uint_t len) { return sWifiClients[clientIndex]->setSocketOption(option, value, len); }
-        s32  SetSocketOption(s16 clientIndex, s32 level, s32 option, const void *value, uint_t len) { return sWifiClients[clientIndex]->setSocketOption(level, option, value, len); }
-        s32  GetSocketOption(s16 clientIndex, s32 level, s32 option, const void *value, uint_t size) { return sWifiClients[clientIndex]->getSocketOption(level, option, value, size); }
-        s32  SetOption(s16 clientIndex, s32 option, s32 *value) { return sWifiClients[clientIndex]->setOption(option, value); }
-        s32  GetOption(s16 clientIndex, s32 option, s32 *value) { return sWifiClients[clientIndex]->getOption(option, value); }
-        void SetConnectionTimeout(s16 clientIndex, u32 milliseconds) { sWifiClients[clientIndex]->setConnectionTimeout(milliseconds); }
-        s32  SetNoDelay(s16 clientIndex, bool nodelay) { return sWifiClients[clientIndex]->setNoDelay(nodelay); }
-        bool GetNoDelay(s16 clientIndex) { return sWifiClients[clientIndex]->getNoDelay(); }
+        s32  SetSocketOption(s16 clientIndex, s32 option, char *value, uint_t len) { return gWiFiClient[clientIndex]->setSocketOption(option, value, len); }
+        s32  SetSocketOption(s16 clientIndex, s32 level, s32 option, const void *value, uint_t len) { return gWiFiClient[clientIndex]->setSocketOption(level, option, value, len); }
+        s32  GetSocketOption(s16 clientIndex, s32 level, s32 option, const void *value, uint_t size) { return gWiFiClient[clientIndex]->getSocketOption(level, option, value, size); }
+        s32  SetOption(s16 clientIndex, s32 option, s32 *value) { return gWiFiClient[clientIndex]->setOption(option, value); }
+        s32  GetOption(s16 clientIndex, s32 option, s32 *value) { return gWiFiClient[clientIndex]->getOption(option, value); }
+        void SetConnectionTimeout(s16 clientIndex, u32 milliseconds) { gWiFiClient[clientIndex]->setConnectionTimeout(milliseconds); }
+        s32  SetNoDelay(s16 clientIndex, bool nodelay) { return gWiFiClient[clientIndex]->setNoDelay(nodelay); }
+        bool GetNoDelay(s16 clientIndex) { return gWiFiClient[clientIndex]->getNoDelay(); }
 
         IPAddress_t RemoteIP(s16 clientIndex)
         {
-            IPAddress ip = sWifiClients[clientIndex]->remoteIP();
+            IPAddress ip = gWiFiClient[clientIndex]->remoteIP();
             return IPAddress_t(ip[0], ip[1], ip[2], ip[3]);
         }
         IPAddress_t RemoteIP(s16 clientIndex, s32 fd)
         {
-            IPAddress ip = sWifiClients[clientIndex]->remoteIP(fd);
+            IPAddress ip = gWiFiClient[clientIndex]->remoteIP(fd);
             return IPAddress_t(ip[0], ip[1], ip[2], ip[3]);
         }
-        u16         RemotePort(s16 clientIndex) { return sWifiClients[clientIndex]->remotePort(); }
-        u16         RemotePort(s16 clientIndex, s32 fd) { return sWifiClients[clientIndex]->remotePort(fd); }
+        u16         RemotePort(s16 clientIndex) { return gWiFiClient[clientIndex]->remotePort(); }
+        u16         RemotePort(s16 clientIndex, s32 fd) { return gWiFiClient[clientIndex]->remotePort(fd); }
         IPAddress_t LocalIP(s16 clientIndex)
         {
-            IPAddress ip = sWifiClients[clientIndex]->localIP();
+            IPAddress ip = gWiFiClient[clientIndex]->localIP();
             return IPAddress_t(ip[0], ip[1], ip[2], ip[3]);
         }
         IPAddress_t LocalIP(s16 clientIndex, s32 fd)
         {
-            IPAddress ip = sWifiClients[clientIndex]->localIP(fd);
+            IPAddress ip = gWiFiClient[clientIndex]->localIP(fd);
             return IPAddress_t(ip[0], ip[1], ip[2], ip[3]);
         }
-        u16 LocalPort(s16 clientIndex) { return sWifiClients[clientIndex]->localPort(); }
-        u16 LocalPort(s16 clientIndex, s32 fd) { return sWifiClients[clientIndex]->localPort(fd); }
+        u16 LocalPort(s16 clientIndex) { return gWiFiClient[clientIndex]->localPort(); }
+        u16 LocalPort(s16 clientIndex, s32 fd) { return gWiFiClient[clientIndex]->localPort(fd); }
 
-    }  // namespace nwifi
+    }  // namespace nclient
 }  // namespace ncore
 
 #else
@@ -112,7 +105,7 @@ namespace ncore
 
 namespace ncore
 {
-    namespace nwifi
+    namespace nclient
     {
         struct WifiClient
         {
@@ -128,56 +121,35 @@ namespace ncore
             bool sse;
         };
 
-        static WifiClient **sWifiClients = nullptr;
-        static s16          sNumClients  = 0;
-        static s16          sMaxClients  = 0;
+        s16         gNumClients = 0;
+        WifiClient *sWifiClients[4];
 
-        void InitMaxClients(alloc_t *allocator, u16 max_clients)
+        s16 NewClient(alloc_t* allocator)
         {
-            sWifiClients = g_allocate_array_and_clear<WifiClient *>(allocator, max_clients);
-            sNumClients  = 0;
-            sMaxClients  = max_clients;
-        }
-
-        s16 NewClient(alloc_t *allocator)
-        {
-            if (sNumClients >= sMaxClients)
-            {
-                if (sMaxClients == 0)
-                {
-                    InitMaxClients(allocator, 1);
-                    sMaxClients = 1;
-                }
-                else
-                {
-                    return -1;
-                }
-            }
-
-            s16 clientIndex           = sNumClients++;
-            sWifiClients[clientIndex] = g_allocate<WifiClient>(allocator);
-            return clientIndex;
+            sWifiClients[gNumClients] = allocator->construct<WifiClient>();
+            gNumClients++;
+            return gNumClients - 1;
         }
 
-        s32 Connect(s16 clientIndex, IPAddress_t ip, u16 port)
+        nstatus::status_t Connect(s16 clientIndex, IPAddress_t ip, u16 port)
         {
             sWifiClients[clientIndex]->status = nstatus::Connected;
-            return nstatus::Connected;
+            return sWifiClients[clientIndex]->status;
         }
-        s32 Connect(s16 clientIndex, IPAddress_t ip, u16 port, s32 timeout_ms)
+        nstatus::status_t Connect(s16 clientIndex, IPAddress_t ip, u16 port, s32 timeout_ms)
         {
             sWifiClients[clientIndex]->status = nstatus::Connected;
-            return nstatus::Connected;
+            return sWifiClients[clientIndex]->status;
         }
-        s32 Connect(s16 clientIndex, const char *host, u16 port)
+        nstatus::status_t Connect(s16 clientIndex, const char *host, u16 port)
         {
             sWifiClients[clientIndex]->status = nstatus::Connected;
-            return nstatus::Connected;
+            return sWifiClients[clientIndex]->status;
         }
-        s32 Connect(s16 clientIndex, const char *host, u16 port, s32 timeout_ms)
+        nstatus::status_t Connect(s16 clientIndex, const char *host, u16 port, s32 timeout_ms)
         {
             sWifiClients[clientIndex]->status = nstatus::Connected;
-            return nstatus::Connected;
+            return sWifiClients[clientIndex]->status;
         }
         uint_t Write(s16 clientIndex, u8 data) { return 1; }
         uint_t Write(s16 clientIndex, const u8 *buf, uint_t size) { return size; }
@@ -212,7 +184,7 @@ namespace ncore
         u16         LocalPort(s16 clientIndex) { return 0; }
         u16         LocalPort(s16 clientIndex, s32 fd) { return 0; }
 
-    }  // namespace nwifi
+    }  // namespace nclient
 }  // namespace ncore
 
 #endif
