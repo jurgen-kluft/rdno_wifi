@@ -116,6 +116,8 @@ namespace ncore
             {
             }
 
+            DCORE_CLASS_PLACEMENT_NEW_DELETE
+
             s16  fd;
             s16  status;
             bool sse;
