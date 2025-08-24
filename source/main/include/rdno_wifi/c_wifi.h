@@ -5,19 +5,17 @@
 #    pragma once
 #endif
 
-#include "rdno_core/c_debug.h"
-
 namespace ncore
 {
     // IPAddress ...
     struct IPAddress_t
     {
-        byte A, B, C, D;
+        byte m_address[4];
     };
 
     struct MACAddress_t
     {
-        byte A, B, C, D, E, F;
+        byte m_address[6];
     };
 
     namespace nencryption
@@ -47,7 +45,7 @@ namespace ncore
 
     namespace nstatus
     {
-        typedef u8     status_t;
+        typedef s32     status_t;
         const status_t Idle            = 0;
         const status_t NoSSIDAvailable = 1;
         const status_t ScanCompleted   = 2;
@@ -68,10 +66,6 @@ namespace ncore
             byte B0, B1, B2, B3, B4, B5, B6, B7;
         };
 
-        // BSSID gets the MAC address of the router you are connected to.
-        // @see: https://www.arduino.cc/en/Reference/WiFiBSSID
-        BSID_t* GetBSSID();
-
         // SetHostName ...
         bool SetHostname(const char* hostname);
 
@@ -86,45 +80,37 @@ namespace ncore
         // @see: https://www.arduino.cc/en/Reference/WiFiBegin
         nstatus::status_t BeginEncrypted(const char* ssid, const char* passphrase);
 
+        // Status returns the connection status.
+        // @see: https://www.arduino.cc/en/Reference/WiFiStatus
+        nstatus::status_t Status();
+
         // Disconnect disconnects the WiFi shield from the current network.
         // @see: https://www.arduino.cc/en/Reference/WiFiDisconnect
         void Disconnect();
 
         // LocalIP gets the WiFi shield's IP address.
         // @see: https://www.arduino.cc/en/Reference/WiFiLocalIP
-        IPAddress_t* LocalIP();
+        IPAddress_t LocalIP();
 
         // MacAddress gets the MAC address of the WiFi shield.
         // @see: https://www.arduino.cc/en/Reference/WiFiMacAddress
-        MACAddress_t* MacAddress();
+        MACAddress_t MacAddress();
 
         // RSSI gets the signal strength of the connection to the router.
         // @see: https://www.arduino.cc/en/Reference/WiFiRSSI
-        int RSSI();
+        s32 RSSI();
 
         // ScanNetworks scans for available WiFi networks and returns the discovered number.
         // @see: https://www.arduino.cc/en/Reference/WiFiScanNetworks
-        int ScanNetworks();
+        s32 ScanNetworks();
 
         // SetDNS allows you to configure the DNS (Domain Name System) server.
         // @see: https://www.arduino.cc/en/Reference/WiFiSetDns
         void SetDNS(const IPAddress_t& dns);
 
-        // Status returns the connection status.
-        // @see: https://www.arduino.cc/en/Reference/WiFiStatus
-        nstatus::status_t Status();
-
         // Reconnect attempts to reconnect to the last connected network.
         // Basically does a Disconnect() followed by a Begin().
         bool Reconnect();
-
-        // SSID gets the SSID of the current network.
-        // @see: https://www.arduino.cc/en/Reference/WiFiSSID
-        const char* SSID();
-
-        // SSID gets the SSID of a scanned network
-        // @see: https://www.arduino.cc/en/Reference/WiFiSSID
-        const char* SSID(s32 index);
 
     }  // namespace nwifi
 }  // namespace ncore

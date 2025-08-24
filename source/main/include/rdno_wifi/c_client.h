@@ -9,49 +9,43 @@
 
 namespace ncore
 {
-    class alloc_t;
-
     namespace nclient
     {
         // @see: https://docs.arduino.cc/libraries/wifi/#Client%20class
 
-        s16               NewClient(alloc_t* allocator);
-        nstatus::status_t Connect(s16 clientIndex, IPAddress_t ip, u16 port);
-        nstatus::status_t Connect(s16 clientIndex, IPAddress_t ip, u16 port, s32 timeout_ms);
-        nstatus::status_t Connect(s16 clientIndex, const char *host, u16 port);
-        nstatus::status_t Connect(s16 clientIndex, const char *host, u16 port, s32 timeout_ms);
-        uint_t            Write(s16 clientIndex, u8 data);
-        uint_t            Write(s16 clientIndex, const u8 *buf, uint_t size);
+        bool              NewClient();
+        nstatus::status_t Connect(IPAddress_t ip, u16 port);
+        nstatus::status_t Connect(IPAddress_t ip, u16 port, s32 timeout_ms);
+        nstatus::status_t Connect(const char *host, u16 port);
+        nstatus::status_t Connect(const char *host, u16 port, s32 timeout_ms);
+        uint_t            Write(u8 data);
+        uint_t            Write(const u8 *buf, uint_t size);
 
-        s32               Available(s16 clientIndex);
-        s32               Read(s16 clientIndex);
-        s32               Read(s16 clientIndex, u8 *buf, uint_t size);
-        uint_t            ReadBytes(s16 clientIndex, char *buffer, uint_t length);
-        uint_t            ReadBytes(s16 clientIndex, u8 *buffer, uint_t length);
-        s32               Peek(s16 clientIndex);
-        void              Clear(s16 clientIndex);  // clear rx
-        void              Stop(s16 clientIndex);
-        nstatus::status_t Connected(s16 clientIndex);
-        void              SetSSE(s16 clientIndex, bool sse);
-        bool              IsSSE(s16 clientIndex);
+        nstatus::status_t Connected();
+        s32               Available();
+        s32               Read();
+        s32               Read(u8 *buf, uint_t size);
+        uint_t            ReadBytes(char *buffer, uint_t length);
+        uint_t            ReadBytes(u8 *buffer, uint_t length);
+        s32               Peek();
+        void              Clear();  // clear rx
+        void              Stop();
+        void              SetSSE(bool sse);
+        bool              IsSSE();
 
-        s32  SetSocketOption(s16 clientIndex, s32 option, char *value, uint_t len);
-        s32  SetSocketOption(s16 clientIndex, s32 level, s32 option, const void *value, uint_t len);
-        s32  GetSocketOption(s16 clientIndex, s32 level, s32 option, const void *value, uint_t size);
-        s32  SetOption(s16 clientIndex, s32 option, s32 *value);
-        s32  GetOption(s16 clientIndex, s32 option, s32 *value);
-        void SetConnectionTimeout(s16 clientIndex, u32 milliseconds);
-        s32  SetNoDelay(s16 clientIndex, bool nodelay);
-        bool GetNoDelay(s16 clientIndex);
+        s32  SetSocketOption(s32 option, char *value, uint_t len);
+        s32  SetSocketOption(s32 level, s32 option, const void *value, uint_t len);
+        s32  GetSocketOption(s32 level, s32 option, const void *value, uint_t size);
+        s32  SetOption(s32 option, s32 *value);
+        s32  GetOption(s32 option, s32 *value);
+        void SetConnectionTimeout(u32 milliseconds);
+        s32  SetNoDelay(bool nodelay);
+        bool GetNoDelay();
 
-        IPAddress_t RemoteIP(s16 clientIndex);
-        IPAddress_t RemoteIP(s16 clientIndex, s32 fd);
-        u16         RemotePort(s16 clientIndex);
-        u16         RemotePort(s16 clientIndex, s32 fd);
-        IPAddress_t LocalIP(s16 clientIndex);
-        IPAddress_t LocalIP(s16 clientIndex, s32 fd);
-        u16         LocalPort(s16 clientIndex);
-        u16         LocalPort(s16 clientIndex, s32 fd);
+        IPAddress_t RemoteIP();
+        u16         RemotePort();
+        IPAddress_t LocalIP();
+        u16         LocalPort();
     }  // namespace nclient
 }  // namespace ncore
 

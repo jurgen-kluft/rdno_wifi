@@ -4,7 +4,7 @@
 
 // Generated
 #    include "WiFi.h"
-#    include "WiFiUdp.h"
+// #    include "WiFiUdp.h"
 
 #    include "rdno_wifi/c_wifi.h"
 
@@ -14,64 +14,88 @@ namespace ncore
     {
         IPAddress_t gLocalIP;
 
-        BSID_t* GetBSSID() { return (BSID_t*)WiFi.BSSID(); }
-        bool    SetHostname(const char* hostname)
+        static inline nstatus::status_t sArduinoStatusToNstatus(s32 status)
         {
-            return WiFi.setHostname(hostname);
+            switch (status)
+            {
+                case WL_NO_SHIELD: return nstatus::NoShield;
+                case WL_IDLE_STATUS: return nstatus::Idle;
+                case WL_NO_SSID_AVAIL: return nstatus::NoSSIDAvailable;
+                case WL_SCAN_COMPLETED: return nstatus::ScanCompleted;
+                case WL_CONNECTED: return nstatus::Connected;
+                case WL_CONNECT_FAILED: return nstatus::ConnectFailed;
+                case WL_CONNECTION_LOST: return nstatus::ConnectionLost;
+                case WL_DISCONNECTED: return nstatus::Disconnected;
+            }
+            return nstatus::Idle;  // Unknown status
         }
+
+        bool SetHostname(const char* hostname) { return WiFi.setHostname(hostname); }
 
         bool ConfigIpAddrNone() { return WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); }
 
         nstatus::status_t Begin(const char* ssid)
         {
             // TODO Compile time verification of nstatus::status_t matching the values from the WiFi library ?
-            nstatus::status_t status = (nstatus::status_t)WiFi.begin(ssid);
-            return status;
+            wl_status_t status = WiFi.begin(ssid);
+            return sArduinoStatusToNstatus(status);
         }
 
         nstatus::status_t BeginEncrypted(const char* ssid, const char* passphrase)
         {
             // TODO Compile time verification of nstatus::status_t matching the values from the WiFi library ?
-            nstatus::status_t status = (nstatus::status_t)WiFi.begin(ssid, passphrase);
-            return status;
+            wl_status_t status = WiFi.begin(ssid, passphrase);
+            return sArduinoStatusToNstatus(status);
         }
 
         void Disconnect() { WiFi.disconnect(); }
 
-        int HostByName(const char* hostname, IPAddress_t& outAddr)
+        s32 HostByName(const char* hostname, IPAddress_t& outAddr)
         {
             IPAddress addr;
-            int       result = WiFi.hostByName(hostname, addr);
-            outAddr          = *((IPAddress_t*)&addr);
+            s32       result     = WiFi.hostByName(hostname, addr);
+            outAddr.m_address[0] = addr[0];
+            outAddr.m_address[1] = addr[1];
+            outAddr.m_address[2] = addr[2];
+            outAddr.m_address[3] = addr[3];
             return result;
         }
 
-        IPAddress_t* LocalIP()
+        IPAddress_t LocalIP()
         {
-            IPAddress ip = WiFi.localIP();
-            gLocalIP     = *((IPAddress_t*)&ip);
-            return &gLocalIP;
+            IPAddress   ip = WiFi.localIP();
+            IPAddress_t ipAddr;
+            ipAddr.m_address[0] = ip[0];
+            ipAddr.m_address[1] = ip[1];
+            ipAddr.m_address[2] = ip[2];
+            ipAddr.m_address[3] = ip[3];
+            return ipAddr;
         }
 
-        int  RSSI() { return WiFi.RSSI(); }
-        int  ScanNetworks() { return WiFi.scanNetworks(); }
+        MACAddress_t MacAddress()
+        {
+            MACAddress_t macAddress;
+            uint8_t*     mac = WiFi.macAddress(&macAddress.m_address[0]);
+            return macAddress;
+        }
+
+        s32  RSSI() { return WiFi.RSSI(); }
+        s32  ScanNetworks() { return WiFi.scanNetworks(); }
         void SetDNS(const IPAddress_t& dns)
         {
-            IPAddress ip = *((IPAddress*)&dns);
+            IPAddress ip(dns.m_address[0], dns.m_address[1], dns.m_address[2], dns.m_address[3]);
             WiFi.setDNS(ip);
         }
 
         // TODO Should we add compile time verification of the nencryption::type_t
         // matching the values from the WiFi library?
 
-        nstatus::status_t Status() { return (nstatus::status_t)(WiFi.status()); }
-        bool              Reconnect() { WiFi.reconnect(); }
-        const char*       SSID() { return WiFi.SSID().c_str(); }
-        const char*       SSID(s32 index)
+        nstatus::status_t Status()
         {
-            String ssid = WiFi.SSID(index);
-            return ssid.c_str();
+            wl_status_t status = WiFi.status();
+            return sArduinoStatusToNstatus(status);
         }
+        bool Reconnect() { return WiFi.reconnect(); }
 
     }  // namespace nwifi
 }  // namespace ncore
@@ -100,8 +124,6 @@ namespace ncore
         int                 SocketPort[MaxSocketNum]  = {0};
         int                 SocketState[MaxSocketNum] = {0};
 
-        BSID_t* GetBSSID() { return &CurrentBSSID; }
-
         bool SetHostname(const char* hostname) { return true; }
         bool ConfigIpAddrNone() { return true; }
 
@@ -121,15 +143,15 @@ namespace ncore
             return CurrentStatus;
         }
 
-        void                Disconnect() { CurrentStatus = nstatus::Idle; }
-        int                 HostByName(const char* hostname, const char* addr) { return 0; }
-        IPAddress_t*        LocalIP() { return &CurrentLocalIP; }
-        int                 RSSI() { return CurrentRSSI; }
-        int                 ScanNetworks() { return CurrentNetworks; }
-        void                SetDNS(const IPAddress_t& dns) { CurrentDNS = dns; }
-        nstatus::status_t   Status() { return CurrentStatus; }
-        bool                Reconnect() { return true; }
-        const char*         SSID() { return CurrentSSID; }
+        void              Disconnect() { CurrentStatus = nstatus::Idle; }
+        int               HostByName(const char* hostname, const char* addr) { return 0; }
+        IPAddress_t       LocalIP() { return &CurrentLocalIP; }
+        MACAddress_t      MacAddress() { return MACAddress_t{0, 0, 0, 0, 0, 0}; }
+        int               RSSI() { return CurrentRSSI; }
+        int               ScanNetworks() { return CurrentNetworks; }
+        void              SetDNS(const IPAddress_t& dns) { CurrentDNS = dns; }
+        nstatus::status_t Status() { return CurrentStatus; }
+        bool              Reconnect() { return true; }
 
     }  // namespace nwifi
 }  // namespace ncore
