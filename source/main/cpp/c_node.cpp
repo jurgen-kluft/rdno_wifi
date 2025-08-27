@@ -12,9 +12,14 @@ namespace ncore
         {
             // If config SSID or password is empty, we will wait until we receive a configuration
             // that does have valid SSID and password
-            while (strlen(config->m_ssid) == 0 || strlen(config->m_password) == 0)
+            bool valid_wifi_config = false;
+            bool valid_server_config = false;
+            while (!valid_wifi_config)
             {
                 nwifi::UpdateConfig(config);
+
+                valid_wifi_config = strlen(config->m_ssid) > 0 && strlen(config->m_password) > 0;
+                valid_server_config = strlen(config->m_remote_server) > 0 && config->m_remote_port > 0;
             }
         }
 
