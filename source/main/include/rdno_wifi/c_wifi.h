@@ -5,19 +5,10 @@
 #    pragma once
 #endif
 
+#include "rdno_core/c_network.h"
+
 namespace ncore
 {
-    // IPAddress ...
-    struct IPAddress_t
-    {
-        byte m_address[4];
-    };
-
-    struct MACAddress_t
-    {
-        byte m_address[6];
-    };
-
     namespace nencryption
     {
         typedef u8 type_t;
@@ -45,7 +36,7 @@ namespace ncore
 
     namespace nstatus
     {
-        typedef s32     status_t;
+        typedef s32    status_t;
         const status_t Idle            = 0;
         const status_t NoSSIDAvailable = 1;
         const status_t ScanCompleted   = 2;
@@ -66,6 +57,10 @@ namespace ncore
             byte B0, B1, B2, B3, B4, B5, B6, B7;
         };
 
+        bool SetModeStation();  // Set the WiFi mode to station (client) mode
+        bool SetModeAP();       // Set the WiFi mode to access point mode
+        bool SetModeAPSTA();    // Set the WiFi mode to both station and access point mode
+
         // SetHostName ...
         bool SetHostname(const char* hostname);
 
@@ -83,10 +78,11 @@ namespace ncore
         // Status returns the connection status.
         // @see: https://www.arduino.cc/en/Reference/WiFiStatus
         nstatus::status_t Status();
+        const char*       StatusStr(nstatus::status_t status);
 
-        // Disconnect disconnects the WiFi shield from the current network.
-        // @see: https://www.arduino.cc/en/Reference/WiFiDisconnect
-        void Disconnect();
+          // Disconnect disconnects the WiFi shield from the current network.
+          // @see: https://www.arduino.cc/en/Reference/WiFiDisconnect
+          void Disconnect();
 
         // LocalIP gets the WiFi shield's IP address.
         // @see: https://www.arduino.cc/en/Reference/WiFiLocalIP

@@ -30,6 +30,10 @@ namespace ncore
             return nstatus::Idle;  // Unknown status
         }
 
+        bool SetModeStation() { return WiFi.mode(WIFI_STA); }
+        bool SetModeAP() { return WiFi.mode(WIFI_AP); }
+        bool SetModeAPSTA() { return WiFi.mode(WIFI_AP_STA); }
+
         bool SetHostname(const char* hostname) { return WiFi.setHostname(hostname); }
 
         bool ConfigIpAddrNone() { return WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); }
@@ -95,6 +99,24 @@ namespace ncore
             wl_status_t status = WiFi.status();
             return sArduinoStatusToNstatus(status);
         }
+
+        const char* StatusStr(nstatus::status_t status)
+        {
+            switch (status)
+            {
+                case nstatus::Idle: return "Idle";
+                case nstatus::NoShield: return "No WiFi module";
+                case nstatus::ScanCompleted: return "Scan completed";
+                case nstatus::NoSSIDAvailable: return "Network not available";
+                case nstatus::Connected: return "Connected";
+                case nstatus::ConnectFailed: return "Connection failed (auth failed?)";
+                case nstatus::ConnectionLost: return "Connection lost";
+                case nstatus::Disconnected: return "Disconnected";
+                case nstatus::Stopped: return "Stopped";
+            }
+            return "Unknown";
+        }
+
         bool Reconnect() { return WiFi.reconnect(); }
 
     }  // namespace nwifi
@@ -124,6 +146,9 @@ namespace ncore
         int                 SocketPort[MaxSocketNum]  = {0};
         int                 SocketState[MaxSocketNum] = {0};
 
+        bool SetModeStation() { return true; }
+        bool SetModeAP() { return true; }
+        bool SetModeAPSTA() { return true; }
         bool SetHostname(const char* hostname) { return true; }
         bool ConfigIpAddrNone() { return true; }
 
@@ -151,6 +176,7 @@ namespace ncore
         int               ScanNetworks() { return CurrentNetworks; }
         void              SetDNS(const IPAddress_t& dns) { CurrentDNS = dns; }
         nstatus::status_t Status() { return CurrentStatus; }
+        const char*       StatusStr(nstatus::status_t status) { return "Simulated"; }
         bool              Reconnect() { return true; }
 
     }  // namespace nwifi
