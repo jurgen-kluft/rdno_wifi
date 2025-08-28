@@ -67,10 +67,6 @@ namespace ncore
         bool SetModeAP();       // Set the WiFi mode to access point mode
         bool SetModeAPSTA();    // Set the WiFi mode to both station and access point mode
 
-        // UpdateConfig updates the WiFi configuration by receiving and parsing TCP packets
-        // from the AP access point.
-        void UpdateConfig(nvstore::config_t* config, s16 (*nameToIndex)(const char * str, s32 len));
-
         // SetHostName ...
         bool SetHostname(const char* hostname);
 
