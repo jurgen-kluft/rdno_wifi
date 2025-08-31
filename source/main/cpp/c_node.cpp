@@ -2,6 +2,7 @@
 
 #    include "Arduino.h"
 #    include "WiFi.h"
+#    include "rdno_core/c_str.h"
 #    include "rdno_wifi/c_wifi.h"
 
 namespace ncore
@@ -47,27 +48,25 @@ namespace ncore
         }
 
         // TODO move into rdno_apps
-        s16 KeyToIndex(const char* str, s32 len)
+        s16 KeyToIndex(str_t const& str)
         {
-            if (len == 4 && strncmp(str, "ssid", 4) == 0)
+            if (str_len(str) == 4 && str_cmp_n(str, "ssid", 4, false) == 0)
                 return 0;
-            if (len == 8 && strncmp(str, "password", 8) == 0)
+            if (str_len(str) == 8 && str_cmp(str, "password", 8, false) == 0)
                 return 1;
-            if (len == 9 && strncmp(str, "ap_ssid", 7) == 0)
+            if (str_len(str) == 9 && str_cmp(str, "ap_ssid", 7, false) == 0)
                 return 2;
-            if (len == 11 && strncmp(str, "ap_password", 11) == 0)
+            if (str_len(str) == 11 && str_cmp(str, "ap_password", 11, false) == 0)
                 return 3;
-            if (len == 13 && strncmp(str, "remote_server", 13) == 0)
+            if (str_len(str) == 13 && str_cmp(str, "remote_server", 13, false) == 0)
                 return 4;
-            if (len == 11 && strncmp(str, "remote_port", 11) == 0)
+            if (str_len(str) == 11 && str_cmp(str, "remote_port", 11, false) == 0)
                 return 5;
 
-            // check if 'str' is a number and return it as index
-            char* endPtr = nullptr;
-            long  index  = strtol(str, &endPtr, 10);
-            if (endPtr != str && index >= 0 && index < 108)
+            s32 value = 0;
+            if (from_str(str, &value, 10) && value >= 0 && value < 256)
             {
-                return static_cast<s16>(index);
+                return static_cast<s16>(value);
             }
             return -1;
         }
