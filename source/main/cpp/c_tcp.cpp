@@ -31,9 +31,10 @@ namespace ncore
                 else
                 {
                     gActiveTcpClient = nullptr;
-                    if (!gTcpClient.connected() && gTcpServer.hasClient())
+                    if (gTcpServer.hasClient())
                     {
                         gTcpClient = gTcpServer.accept();
+                        gActiveTcpClient = &gTcpClient;
                     }
                 }
             }

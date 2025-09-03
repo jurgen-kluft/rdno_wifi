@@ -175,7 +175,7 @@ namespace ncore
 
         void              disconnect() { CurrentStatus = nstatus::Idle; }
         int               hostbyname(const char* hostname, const char* addr) { return 0; }
-        IPAddress_t       local_IP() { return &CurrentLocalIP; }
+        IPAddress_t       local_IP() { return CurrentLocalIP; }
         MACAddress_t      mac_address() { return MACAddress_t{0, 0, 0, 0, 0, 0}; }
         int               get_RSSI() { return CurrentRSSI; }
         int               scan_networks() { return CurrentNetworks; }
