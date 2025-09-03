@@ -3,6 +3,7 @@
 #    include "Arduino.h"
 #    include "WiFi.h"
 #    include "rdno_wifi/c_wifi.h"
+#    include "rdno_wifi/c_tcp.h"
 #    include "rdno_core/c_str.h"
 #    include "rdno_core/c_nvstore.h"
 
@@ -10,25 +11,25 @@ namespace ncore
 {
     namespace nwifi
     {
-        bool NodeConnectToWiFi(nvstore::config_t* config)
+        bool node_connect_to_WiFi(nvstore::config_t* config)
         {
             // Disconnect from WiFi
-            nwifi::Disconnect();
+            nwifi::disconnect();
 
             // Set WiFi to station mode
-            nwifi::SetModeStation();
+            nwifi::set_mode_STA();
 
             // Wait for 2 seconds
             ntimer::Delay(2000);
 
             // Connect to WiFi
-            nwifi::BeginEncrypted(config->m_ssid, config->m_password);
+            nwifi::begin_encrypted(config->m_ssid, config->m_password);
 
             s32       attempts    = 0;
-            const s32 maxAttempts = 6 * 5; // Try for 1 minute
+            const s32 maxAttempts = 6 * 5;  // Try for 1 minute
             while (attempts < maxAttempts)
             {
-                nstatus::status_t wifiStatus = nwifi::Status();
+                nstatus::status_t wifiStatus = nwifi::status();
                 nserial::Println("Connecting to WiFi.");
                 s32 seconds = 0;
                 while (seconds < 10 && wifiStatus != nstatus::Connected)
@@ -36,7 +37,7 @@ namespace ncore
                     nserial::Println("    Connecting...");
                     ntimer::Delay(2000);
                     seconds += 2;
-                    wifiStatus = nwifi::Status();
+                    wifiStatus = nwifi::status();
                 }
 
                 if (wifiStatus == nstatus::Connected)
@@ -51,73 +52,48 @@ namespace ncore
             return false;
         }
 
-        // TODO move into rdno_apps
-        s16 KeyToIndex(str_t const& str)
+        void node_update(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
-            if (str_len(str) == 4 && str_cmp_n(str, "ssid", 4, false) == 0)
-                return 0;
-            if (str_len(str) == 8 && str_cmp(str, "password", 8, false) == 0)
-                return 1;
-            if (str_len(str) == 9 && str_cmp(str, "ap_ssid", 7, false) == 0)
-                return 2;
-            if (str_len(str) == 11 && str_cmp(str, "ap_password", 11, false) == 0)
-                return 3;
-            if (str_len(str) == 13 && str_cmp(str, "remote_server", 13, false) == 0)
-                return 4;
-            if (str_len(str) == 11 && str_cmp(str, "remote_port", 11, false) == 0)
-                return 5;
-
-            s32 value = 0;
-            if (from_str(str, &value, 10) && value >= 0 && value < 256)
-            {
-                return static_cast<s16>(value);
-            }
-            return -1;
-        }
-
-        void NodeUpdate(nvstore::config_t* config, s16 (*funcNameToIndex)(str_t const& str))
-        {
+            const u64 startTimeInMillis       = millis();
             s32       connectToWiFiSeconds    = 0;
-            const s32 maxConnectToWiFiSeconds = 5 * 60; // Try for 5 minutes to connect to WiFi
+            const s32 maxConnectToWiFiSeconds = 5 * 60;  // Try for 5 minutes to connect to WiFi
             while (connectToWiFiSeconds < maxConnectToWiFiSeconds)
             {
-                nwifi::Disconnect();
-                nwifi::SetModeAP();
+                nwifi::disconnect();
+                nwifi::set_mode_AP();
 
                 // Start the access point to receive configuration
                 str_t ap_ssid     = str_const("esp32");
                 str_t ap_password = str_const("1234");
-                nvstore::GetString(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
-                nvstore::GetString(config, nvstore::PARAM_ID_AP_PASSWORD, ap_password);
+                nvstore::get_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
+                nvstore::get_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_password);
 
-                WiFi.softAP(ap_ssid, ap_password);
+                nwifi::begin_AP(ap_ssid, ap_password);
 
                 nserial::Println("Access Point started to configure settings.");
 
                 // Start the TCP server to listen for configuration data
-                gTcpServer.begin();
+                ntcp::start_server(31337);
 
                 char  msgBytes[256];
                 str_t msg = str_mutable(msgBytes, 256);
 
                 s32       waitForClientSeconds    = 0;
-                const s32 maxWaitForClientSeconds = 60; // Wait for 1 minute for a client to connect
+                const s32 maxWaitForClientSeconds = 60;  // Wait for 1 minute for a client to connect
                 while (waitForClientSeconds < maxWaitForClientSeconds)
                 {
-                    // Wait for a client to connect
-                    WiFiClient client = gTcpServer.available();
-                    if (client)
+                    ntcp::client_t client = ntcp::server_handle_client();
+                    if (client != nullptr)
                     {
-                        // TODO client connected, now read message
-
-                        if (msgLength > 0)
+                        ntcp::client_recv_msg(client, msg);
+                        if (str_len(msg) > 0)
                         {
                             str_t outKey;
                             str_t outValue;
-                            while (nvstore::ParseKeyValue(msg, outKey, outValue))
+                            while (nvstore::parse_keyvalue(msg, outKey, outValue))
                             {
-                                const s16 index = funcNameToIndex(outKey);
-                                nvstore::ParseValue(config, index, outValue, outValueLength);
+                                const s16 index = nameToIndex(outKey);
+                                nvstore::parse_value(config, index, outValue, outValueLength);
                             }
                             str_clear(msg);
 
@@ -127,16 +103,16 @@ namespace ncore
                             str_t remote_server = str_empty();
                             s32   remote_port   = 0;
 
-                            nvstore::GetString(config, nvstore::PARAM_ID_WIFI_SSID, ssid);
-                            nvstore::GetString(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass);
-                            nvstore::GetString(config, nvstore::PARAM_ID_REMOTE_SERVER_IP, remote_server);
-                            nvstore::GetInt(config, nvstore::PARAM_ID_REMOTE_SERVER_PORT, remote_port);
+                            nvstore::get_string(config, nvstore::PARAM_ID_WIFI_SSID, ssid);
+                            nvstore::get_string(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass);
+                            nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER_IP, remote_server);
+                            nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_SERVER_PORT, remote_port);
 
                             const bool valid_wifi_config   = IsValidSSID(ssid) && IsValidPassword(pass);
                             const bool valid_server_config = IsValidIPAddress(remote_server) && IsValidPort(remote_port);
                             if (valid_wifi_config && valid_server_config)
                             {
-                                break; // exit the loop if we have valid configuration
+                                break;  // exit the loop if we have valid configuration
                             }
                         }
                     }
@@ -147,46 +123,49 @@ namespace ncore
                     }
                 }
 
-                gTcpServer.stop();           // Stop the TCP server
-                WiFi.softAPdisconnect(true); // Stop the access point
+                ntcp::stop_server();
+                nwifi::disconnect_AP(true);  // Stop the access point
 
                 nserial::Println("Configuration access point stopped.");
 
-                if (NodeConnectToWiFi(config))
+                if (node_connect_to_WiFi(config))
                     break;
+
+                // Calculate how long we've been trying to connect to WiFi
+                connectToWiFiSeconds = (millis() - startTimeInMillis) / 1000;
             }
         }
 
-        void NodeSetup(nvstore::config_t* config)
+        void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
             if (config == nullptr)
                 return
 
-                    NodeUpdate(config);
+            node_update(config, nameToIndex);
         }
 
-        void NodeLoop(nvstore::config_t* config)
+        void node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
-            if (nwifi::Status() != nstatus::Connected || nclient::Connected() != nstatus::Connected)
+            if (nwifi::status() != nstatus::Connected || nclient::connected() != nstatus::Connected)
             {
-                NodeUpdate(config);
+                node_update(config, nameToIndex);
             }
 
-            if (nclient::Connected() != nstatus::Connected)
+            if (nclient::connected() != nstatus::Connected)
             {
-                nclient::Stop(); // Stop any existing client connection
+                nclient::stop();  // Stop any existing client connection
 
                 nserial::Println("Connecting to server.");
-                nstatus::status_t clientStatus = nclient::Connected();
-                nstatus::status_t wifiStatus   = nwifi::Status();
+                nstatus::status_t clientStatus = nclient::connected();
+                nstatus::status_t wifiStatus   = nwifi::status();
                 s32               attempts     = 0;
-                const s32         maxAttempts  = 6 * 5; // Try for 5 minutes
+                const s32         maxAttempts  = 6 * 5;  // Try for 5 minutes
                 while (clientStatus != nstatus::Connected && wifiStatus == nstatus::Connected && attempts < maxAttempts)
                 {
                     nserial::Println("    Connecting...");
                     ntimer::Delay(2000);
-                    clientStatus = nclient::Connect(config->m_remote_server, config->m_remote_port, 8000); // connect to server
-                    wifiStatus   = nwifi::Status();
+                    clientStatus = nclient::connect(config->m_remote_server, config->m_remote_port, 8000);  // connect to server
+                    wifiStatus   = nwifi::status();
                     attempts++;
                 }
 
@@ -194,12 +173,12 @@ namespace ncore
                 {
                     nserial::Println("Connected to server.");
 
-                    IPAddress_t localIP = nclient::LocalIP();
+                    IPAddress_t localIP = nclient::local_IP();
                     nserial::Print("IP: ");
                     nserial::PrintIp(localIP);
                     nserial::Println("");
 
-                    MACAddress_t mac = nwifi::MacAddress();
+                    MACAddress_t mac = nwifi::mac_address();
                     nserial::Print("MAC: ");
                     nserial::PrintMac(mac);
                     nserial::Println("");
@@ -207,13 +186,13 @@ namespace ncore
                 else
                 {
                     nserial::Println("Failed to connect to server.");
-                    nclient::Stop(); // Stop any existing client connection
+                    nclient::stop();  // Stop any existing client connection
                 }
             }
         }
 
-    } // namespace nwifi
-} // namespace ncore
+    }  // namespace nwifi
+}  // namespace ncore
 
 #else
 
@@ -223,8 +202,22 @@ namespace ncore
 {
     namespace nwifi
     {
+        void node_update(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        {
+            // No update needed for non-ESP32 platforms
+        }
 
-    } // namespace nwifi
-} // namespace ncore
+        void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        {
+            // No setup needed for non-ESP32 platforms
+        }
+        
+        void node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        {
+            // No loop needed for non-ESP32 platforms
+        }
+
+    }  // namespace nwifi
+}  // namespace ncore
 
 #endif
