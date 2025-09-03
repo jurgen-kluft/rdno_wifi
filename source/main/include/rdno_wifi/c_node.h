@@ -1,5 +1,5 @@
-#ifndef __RDNO_CORE_WIFI_H__
-#define __RDNO_CORE_WIFI_H__
+#ifndef __RDNO_CORE_WIFI_NODE_H__
+#define __RDNO_CORE_WIFI_NODE_H__
 #include "rdno_core/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
@@ -36,4 +36,4 @@ namespace ncore
     }  // namespace nwifi
 }  // namespace ncore
 
-#endif  // __RDNO_CORE_WIFI_H__
+#endif  // __RDNO_CORE_WIFI_NODE_H__
