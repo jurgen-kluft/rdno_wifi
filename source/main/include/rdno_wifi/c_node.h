@@ -29,9 +29,8 @@ namespace ncore
 
         // UpdateConfig updates the WiFi configuration by receiving and parsing TCP packets
         // from the AP access point.
-        void node_update(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
         void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
-        void node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
+        bool node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
 
     }  // namespace nwifi
 }  // namespace ncore
