@@ -96,6 +96,7 @@ namespace ncore
                         sRemoteConnectState = REMOTE_CONNECT_ERROR;
                         return -1;
                     }
+                    sRemoteConnectState = REMOTE_CONNECT_CONNECTING;
                 }
                 break;
 
