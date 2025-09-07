@@ -32,7 +32,6 @@ namespace ncore
             {
                 case WIFI_CONNECT_BEGIN:
                 {
-                    nwifi::disconnect();    // Disconnect from WiFi
                     nwifi::set_mode_STA();  // Set WiFi to station mode
 
                     str_t ssid;
@@ -44,6 +43,7 @@ namespace ncore
 
                     nserial::println("Connecting to WiFi.");
                     nwifi::begin_encrypted(ssid.m_const, pass.m_const);  // Connect to WiFi
+                    
                     sWiFiConnectStartTimeInMillis = millis();
                     sWiFiConnectState             = WIFI_CONNECT_CONNECTING;
                 }
@@ -96,7 +96,9 @@ namespace ncore
                         sRemoteConnectState = REMOTE_CONNECT_ERROR;
                         return -1;
                     }
-                    sRemoteConnectState = REMOTE_CONNECT_CONNECTING;
+
+                    sRemoteConnectStartTimeInMillis = millis();
+                    sRemoteConnectState             = REMOTE_CONNECT_CONNECTING;
                 }
                 break;
 
@@ -105,7 +107,9 @@ namespace ncore
                     str_t remote_server;
                     if (!nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server))
                         return -1;
-                    const s32 remote_port = nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, 0);
+                    s32 remote_port = 0;
+                    if (!nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port))
+                        return -1;
 
                     nstatus::status_t clientStatus = nremote::connect(remote_server.m_const, remote_port, 5000);
                     if (clientStatus == nstatus::Connected)
@@ -127,7 +131,7 @@ namespace ncore
                     }
 
                     const u64 currentTimeInMillis = millis();
-                    if (currentTimeInMillis - sRemoteConnectStartTimeInMillis > 5 * 60 * 1000)  // 5 minutes timeout
+                    if (currentTimeInMillis - sRemoteConnectStartTimeInMillis > 10 * 1000)
                     {
                         nserial::println("  -> Failed to connect to remote (timeout).");
                         sRemoteConnectState = REMOTE_CONNECT_ERROR;
@@ -189,11 +193,20 @@ namespace ncore
                         ntcp::client_recv_msg(client, msg);
                         if (str_len(msg) > 0)
                         {
+                            nserial::println("Access Point, received message from connected client");
                             str_t outKey;
                             str_t outValue;
                             while (nvstore::parse_keyvalue(msg, outKey, outValue))
                             {
                                 const s16 index = nameToIndex(outKey);
+                                nserial::print("Parse ");
+                                str_print(outKey);
+                                nserial::print(" = ");
+                                str_print(outValue);
+                                nserial::print(", index = ");
+                                nserial::print((s32)index);
+                                nserial::println("");
+
                                 nvstore::parse_value(config, index, outValue);
                             }
                             str_clear(msg);
@@ -209,16 +222,34 @@ namespace ncore
                             nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
                             nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
 
+                            nserial::println("Access point, new configuration:");
+                            nserial::print("    SSID: ");
+                            nserial::println(ssid.m_const);
+                            nserial::print("    PASSWORD: ");
+                            nserial::println(pass.m_const);
+                            nserial::print("    REMOTE_SERVER: ");
+                            nserial::println(remote_server.m_const);
+                            nserial::print("    REMOTE_PORT: ");
+                            nserial::print(remote_port);
+                            nserial::println("");
+
                             const bool valid_wifi_config   = is_valid_SSID(ssid) && is_valid_password(pass);
                             const bool valid_server_config = is_valid_IPAddress(remote_server) && is_valid_port(remote_port);
                             if (valid_wifi_config && valid_server_config)
                             {
-                                ntcp::server_stop();         // Stop the TCP server
-                                nwifi::disconnect_AP(true);  // Stop the access point
+                                ntcp::server_stop();          // Stop the TCP server
+                                nwifi::disconnect_AP(false);  // Stop the access point
 
-                                nserial::println("Access point, received configuration.");
+                                nserial::println("Access point, new configuration approved.");
+                                nvstore::save(config);         // Save the configuration to non-volatile storage
 
-                                sState = NODE_WIFI_CONNECTING;
+                                sState              = NODE_WIFI_CONNECTING;
+                                sWiFiConnectState   = WIFI_CONNECT_BEGIN;
+                                sRemoteConnectState = REMOTE_CONNECT_BEGIN;
+                            }
+                            else
+                            {
+                                nserial::println("Access point, invalid configuration received, waiting for new configuration.");
                             }
                         }
                     }
@@ -230,7 +261,8 @@ namespace ncore
                     const s32 result = node_connect_to_WiFi(config);
                     if (result == 1)
                     {
-                        sState = NODE_REMOTE_CONNECTING;
+                        sRemoteConnectState = REMOTE_CONNECT_BEGIN;
+                        sState              = NODE_REMOTE_CONNECTING;
                     }
                     else if (result == -1)
                     {

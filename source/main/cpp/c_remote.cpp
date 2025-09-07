@@ -11,7 +11,7 @@ namespace ncore
     {
         ncore::s16 gNumClients = 0;
         WiFiClient gWiFiClient;
-
+        
         nstatus::status_t connect(IPAddress_t _ip, u16 _port)
         {
             IPAddress ip(_ip.m_address[0], _ip.m_address[1], _ip.m_address[2], _ip.m_address[3]);
