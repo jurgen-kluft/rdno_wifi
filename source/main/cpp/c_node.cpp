@@ -43,7 +43,7 @@ namespace ncore
 
                     nserial::println("Connecting to WiFi.");
                     nwifi::begin_encrypted(ssid.m_const, pass.m_const);  // Connect to WiFi
-                    
+
                     sWiFiConnectStartTimeInMillis = millis();
                     sWiFiConnectState             = WIFI_CONNECT_CONNECTING;
                 }
@@ -125,6 +125,10 @@ namespace ncore
                         nserial::print("     MAC: ");
                         nserial::print(mac);
                         nserial::println("");
+
+                        const char signature[10] = "RDNOv1.0.0";
+                        nremote::write((const u8*)signature, 10);  // Send signature to server
+                        nremote::write(mac.m_address, 6);          // Send MAC address to server
 
                         sRemoteConnectState = REMOTE_CONNECT_CONNECTED;
                         return true;
@@ -241,7 +245,7 @@ namespace ncore
                                 nwifi::disconnect_AP(false);  // Stop the access point
 
                                 nserial::println("Access point, new configuration approved.");
-                                nvstore::save(config);         // Save the configuration to non-volatile storage
+                                nvstore::save(config);  // Save the configuration to non-volatile storage
 
                                 sState              = NODE_WIFI_CONNECTING;
                                 sWiFiConnectState   = WIFI_CONNECT_BEGIN;
