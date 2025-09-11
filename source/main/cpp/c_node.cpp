@@ -35,10 +35,10 @@ namespace ncore
                     nwifi::set_mode_STA();  // Set WiFi to station mode
 
                     str_t ssid;
-                    if (!nvstore::get_string(config, nvstore::PARAM_ID_SSID, ssid))
+                    if (!nvstore::get_string(config, nvstore::PARAM_ID_WIFI_SSID, ssid))
                         return -1;
                     str_t pass;
-                    if (!nvstore::get_string(config, nvstore::PARAM_ID_PASSWORD, pass))
+                    if (!nvstore::get_string(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass))
                         return -1;
 
                     nserial::println("Connecting to WiFi.");
@@ -106,12 +106,18 @@ namespace ncore
                 {
                     str_t remote_server;
                     if (!nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server))
+                    {
+                        nserial::println("  -> Remote server parameter not available.");
                         return -1;
+                    }
                     s32 remote_port = 0;
                     if (!nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port))
+                    {
+                        nserial::println("  -> Remote server port parameter not available.");
                         return -1;
+                    }
 
-                    nstatus::status_t clientStatus = nremote::connect(remote_server.m_const, remote_port, 5000);
+                    nstatus::status_t clientStatus = nremote::connect(remote_server.m_const, remote_port, 8000);
                     if (clientStatus == nstatus::Connected)
                     {
                         nserial::println("  -> Connected to remote.");
@@ -126,16 +132,17 @@ namespace ncore
                         nserial::print(mac);
                         nserial::println("");
 
-                        const char signature[10] = "RDNOv1.0.0";
-                        nremote::write((const u8*)signature, 10);  // Send signature to server
-                        nremote::write(mac.m_address, 6);          // Send MAC address to server
+                        u8    macStrBuffer[18];  // "XX:XX:XX:XX:XX:XX" + null terminator
+                        str_t macStr = str_mutable((char*)macStrBuffer, sizeof(macStrBuffer));
+                        ncore::to_str(macStr, mac);
+                        nremote::write(macStrBuffer, sizeof(macStrBuffer));  // Send MAC address as the first message to the server
 
                         sRemoteConnectState = REMOTE_CONNECT_CONNECTED;
                         return true;
                     }
 
                     const u64 currentTimeInMillis = millis();
-                    if (currentTimeInMillis - sRemoteConnectStartTimeInMillis > 10 * 1000)
+                    if (currentTimeInMillis - sRemoteConnectStartTimeInMillis > 60 * 1000)
                     {
                         nserial::println("  -> Failed to connect to remote (timeout).");
                         sRemoteConnectState = REMOTE_CONNECT_ERROR;
@@ -221,8 +228,8 @@ namespace ncore
                             str_t remote_server = str_empty();
                             s32   remote_port   = 0;
 
-                            nvstore::get_string(config, nvstore::PARAM_ID_SSID, ssid);
-                            nvstore::get_string(config, nvstore::PARAM_ID_PASSWORD, pass);
+                            nvstore::get_string(config, nvstore::PARAM_ID_WIFI_SSID, ssid);
+                            nvstore::get_string(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass);
                             nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
                             nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
 
