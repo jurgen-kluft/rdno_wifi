@@ -2,7 +2,9 @@
 
 #    include "Arduino.h"
 #    include "WiFi.h"
+
 #    include "rdno_core/c_nvstore.h"
+#    include "rdno_core/c_sensor_packet.h"
 #    include "rdno_core/c_serial.h"
 #    include "rdno_core/c_str.h"
 #    include "rdno_core/c_timer.h"
@@ -80,6 +82,13 @@ namespace ncore
 
         ERemoteConnectState sRemoteConnectState = REMOTE_CONNECT_BEGIN;
         u64                 sRemoteConnectStartTimeInMillis;
+        u64                 sNodeTimeSync = 0;
+
+        u64 node_timesync()
+        {
+            const u64 millis = ntimer::millis();
+            return (millis - sNodeTimeSync);
+        }
 
         s32 node_connect_to_remote(nvstore::config_t* config)
         {
@@ -132,10 +141,14 @@ namespace ncore
                         nserial::print(mac);
                         nserial::println("");
 
-                        u8    macStrBuffer[18];  // "XX:XX:XX:XX:XX:XX" + null terminator
-                        str_t macStr = str_mutable((char*)macStrBuffer, sizeof(macStrBuffer));
-                        ncore::to_str(macStr, mac);
-                        nremote::write(macStrBuffer, sizeof(macStrBuffer));  // Send MAC address as the first message to the server
+                        sensorpacket_t macPacket;
+                        macPacket.begin(0);
+                        const u64 macValue = mac.m_address[0] | (u64(mac.m_address[1]) << 8) | (u64(mac.m_address[2]) << 16) | (u64(mac.m_address[3]) << 24) | (u64(mac.m_address[4]) << 32) | (u64(mac.m_address[5]) << 40);
+                        macPacket.write_sensor_value(nsensor::SensorType::MacAddress, macValue);
+                        macPacket.finalize();
+
+                        nremote::send(macPacket.Data, macPacket.Size);
+                        sNodeTimeSync = ntimer::millis();
 
                         sRemoteConnectState = REMOTE_CONNECT_CONNECTED;
                         return true;

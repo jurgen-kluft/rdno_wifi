@@ -32,6 +32,8 @@ namespace ncore
         void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
         bool node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
 
+        u64 node_timesync();
+
     }  // namespace nwifi
 }  // namespace ncore
 
