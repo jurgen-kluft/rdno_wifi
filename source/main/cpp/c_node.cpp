@@ -4,7 +4,7 @@
 #    include "WiFi.h"
 
 #    include "rdno_core/c_nvstore.h"
-#    include "rdno_core/c_sensor_packet.h"
+#    include "rdno_core/c_packet.h"
 #    include "rdno_core/c_serial.h"
 #    include "rdno_core/c_str.h"
 #    include "rdno_core/c_timer.h"
@@ -141,13 +141,13 @@ namespace ncore
                         nserial::print(mac);
                         nserial::println("");
 
-                        sensorpacket_t macPacket;
-                        macPacket.begin(0);
+                        npacket::packet_t macPacket;
+                        macPacket.begin(0, true);
                         const u64 macValue = mac.m_address[0] | (u64(mac.m_address[1]) << 8) | (u64(mac.m_address[2]) << 16) | (u64(mac.m_address[3]) << 24) | (u64(mac.m_address[4]) << 32) | (u64(mac.m_address[5]) << 40);
-                        macPacket.write_sensor_value(nsensor::SensorType::MacAddress, macValue);
+                        macPacket.write_value(npacket::ntype::MacAddress, macValue);
                         macPacket.finalize();
 
-                        nremote::send(macPacket.Data, macPacket.Size);
+                        nremote::write(macPacket.Data, macPacket.Size);
                         sNodeTimeSync = ntimer::millis();
 
                         sRemoteConnectState = REMOTE_CONNECT_CONNECTED;
