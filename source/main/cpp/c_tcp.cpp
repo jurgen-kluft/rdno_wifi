@@ -21,27 +21,27 @@ namespace ncore
         }
 
         WiFiClient gTcpClient;
-        client_t   gActiveTcpClient = nullptr;
+
+        bool     client_is_connected(client_t client)
+        {
+            if (client == nullptr)
+                return false;
+
+            WiFiClient* tcpClient = static_cast<WiFiClient*>(client);
+            return tcpClient->connected();
+        }
 
         client_t server_handle_client()
         {
             if (gTcpServer)
             {
-                if (gTcpClient.connected())
+                if (gTcpServer.hasClient())
                 {
-                    gActiveTcpClient = &gTcpClient;
-                }
-                else
-                {
-                    gActiveTcpClient = nullptr;
-                    if (gTcpServer.hasClient())
-                    {
-                        gTcpClient       = gTcpServer.accept();
-                        gActiveTcpClient = &gTcpClient;
-                    }
+                    gTcpClient = gTcpServer.accept();
+                    return &gTcpClient;
                 }
             }
-            return gActiveTcpClient;
+            return nullptr;
         }
 
         bool client_recv_msg(client_t client, str_t& msg)
@@ -69,7 +69,7 @@ namespace ncore
         {
             if (gTcpClient)
                 gTcpClient.stop();
-            gActiveTcpClient = nullptr;
+
             if (gTcpServer)
                 gTcpServer.stop();
         }

@@ -13,9 +13,11 @@
 #    include "rdno_wifi/c_remote.h"
 #    include "rdno_wifi/c_tcp.h"
 #    include "rdno_wifi/c_wifi.h"
+#    include "rdno_wifi/c_node.h"
 
 namespace ncore
 {
+#    if 0
     namespace nwifi
     {
         enum EWiFiConnectState
@@ -345,17 +347,21 @@ namespace ncore
         }
 
         bool node_loop(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str)) { return config != nullptr && node_update(config, nameToIndex); }
+    }  // namespace nwifi
+#    endif
 
+    namespace nnode
+    {
         // ----------------------------------------------------------------
         // ----------------------------------------------------------------
-        // scheduler based version
+        // ntask based version
         // ----------------------------------------------------------------
         // ----------------------------------------------------------------
         struct state_node_t
         {
         };
 
-        ntask::result_t func_configure_start(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        ntask::result_t func_configure_start(ntask::executor_t* scheduler, ntask::state_t* state)
         {
             nwifi::disconnect();
             nwifi::set_mode_AP();
@@ -375,7 +381,7 @@ namespace ncore
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_configure_loop(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        ntask::result_t func_configure_loop(ntask::executor_t* scheduler, ntask::state_t* state)
         {
             ntcp::client_t client = ntcp::server_handle_client();
             if (client != nullptr)
@@ -448,7 +454,7 @@ namespace ncore
             }
         }
 
-        ntask::result_t func_connect_to_WiFi_start(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        ntask::result_t func_connect_to_WiFi_start(ntask::executor_t* scheduler, ntask::state_t* state)
         {
             // TODO, can we check the state of the WiFi system, perhaps it is still in STATION mode and connected?
 
@@ -466,7 +472,7 @@ namespace ncore
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_wifi_is_connected(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        ntask::result_t func_wifi_is_connected(ntask::executor_t* scheduler, ntask::state_t* state)
         {
             if (nwifi::status() == nstatus::Connected)
             {
@@ -477,7 +483,7 @@ namespace ncore
             return ntask::RESULT_OK;
         }
 
-        ntask::result_t func_connect_to_remote_start(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        ntask::result_t func_connect_to_remote_start(ntask::executor_t* scheduler, ntask::state_t* state)
         {
             nremote::stop();  // Stop any existing client connection
             if (nwifi::status() != nstatus::Connected)
@@ -490,7 +496,7 @@ namespace ncore
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_remote_is_connected(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        ntask::result_t func_remote_is_connected(ntask::executor_t* scheduler, ntask::state_t* state)
         {
             nconfig::config_t* config = state->config;
 
@@ -537,11 +543,13 @@ namespace ncore
             return ntask::RESULT_OK;
         }
 
-        void schedule_connect(ntask::scheduler_t* scheduler, ntask::program_t main, ntask::state_t* state)
+        void schedule_connect(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state)
         {
             ntask::program_t node_configure_program  = scheduler->program();
             ntask::program_t node_connected_program  = scheduler->program();
             ntask::program_t node_connecting_program = scheduler->program();
+
+            scheduler->boot(node_connecting_program);
 
             // The configure program will start the access point and TCP server to receive configuration data
             // When valid configuration is received it will jump to the connecting program, otherwise it will
@@ -619,29 +627,23 @@ namespace ncore
             scheduler->xend();
         }
 
-    }  // namespace nwifi
+    }  // namespace nnode
 }  // namespace ncore
 
 #else
 
-#    include "rdno_wifi/c_wifi.h"
+#    include "rdno_wifi/c_node.h"
 
 namespace ncore
 {
-    namespace nwifi
+    namespace nnode
     {
-        void node_setup(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str))
-        {
-            // No setup needed for non-ESP32 platforms
+        void schedule_connect(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state) 
+        { 
+            scheduler->boot(main); 
         }
 
-        bool node_loop(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str))
-        {
-            // No loop needed for non-ESP32 platforms
-            return true;
-        }
-
-    }  // namespace nwifi
+    }  // namespace nnode
 }  // namespace ncore
 
 #endif

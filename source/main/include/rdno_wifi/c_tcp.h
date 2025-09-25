@@ -19,6 +19,7 @@ namespace ncore
         client_t server_handle_client();
         void     server_stop();
 
+        bool     client_is_connected(client_t client);
         bool     client_recv_msg(client_t client, str_t& msg);
 
     }  // namespace ntcp
