@@ -3,10 +3,11 @@
 #    include "Arduino.h"
 #    include "WiFi.h"
 
-#    include "rdno_core/c_nvstore.h"
+#    include "rdno_core/c_config.h"
 #    include "rdno_core/c_packet.h"
 #    include "rdno_core/c_serial.h"
 #    include "rdno_core/c_str.h"
+#    include "rdno_core/c_task.h"
 #    include "rdno_core/c_timer.h"
 
 #    include "rdno_wifi/c_remote.h"
@@ -28,7 +29,7 @@ namespace ncore
         EWiFiConnectState sWiFiConnectState = WIFI_CONNECT_BEGIN;
         u64               sWiFiConnectStartTimeInMillis;
 
-        s32 node_connect_to_WiFi(nvstore::config_t* config)
+        s32 node_connect_to_WiFi(nconfig::config_t* config)
         {
             switch (sWiFiConnectState)
             {
@@ -37,10 +38,10 @@ namespace ncore
                     nwifi::set_mode_STA();  // Set WiFi to station mode
 
                     str_t ssid;
-                    if (!nvstore::get_string(config, nvstore::PARAM_ID_WIFI_SSID, ssid))
+                    if (!nconfig::get_string(config, nconfig::PARAM_ID_WIFI_SSID, ssid))
                         return -1;
                     str_t pass;
-                    if (!nvstore::get_string(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass))
+                    if (!nconfig::get_string(config, nconfig::PARAM_ID_WIFI_PASSWORD, pass))
                         return -1;
 
                     nserial::println("Connecting to WiFi.");
@@ -90,7 +91,7 @@ namespace ncore
             return (millis - sNodeTimeSync);
         }
 
-        s32 node_connect_to_remote(nvstore::config_t* config)
+        s32 node_connect_to_remote(nconfig::config_t* config)
         {
             switch (sRemoteConnectState)
             {
@@ -114,13 +115,13 @@ namespace ncore
                 case REMOTE_CONNECT_CONNECTING:
                 {
                     str_t remote_server;
-                    if (!nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server))
+                    if (!nconfig::get_string(config, nconfig::PARAM_ID_REMOTE_SERVER, remote_server))
                     {
                         nserial::println("  -> Remote server parameter not available.");
                         return -1;
                     }
                     s32 remote_port = 0;
-                    if (!nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port))
+                    if (!nconfig::get_int(config, nconfig::PARAM_ID_REMOTE_PORT, remote_port))
                     {
                         nserial::println("  -> Remote server port parameter not available.");
                         return -1;
@@ -180,7 +181,7 @@ namespace ncore
         char       msgBytes[256];
         str_t      msg;
 
-        bool node_update(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        bool node_update(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
             switch (sState)
             {
@@ -191,9 +192,9 @@ namespace ncore
 
                     // Start the access point to receive configuration
                     str_t ap_ssid = str_const("esp32");
-                    nvstore::get_string(config, nvstore::PARAM_ID_AP_SSID, ap_ssid);
+                    nconfig::get_string(config, nconfig::PARAM_ID_AP_SSID, ap_ssid);
                     str_t ap_password = str_const("1234");
-                    nvstore::get_string(config, nvstore::PARAM_ID_AP_PASSWORD, ap_password);
+                    nconfig::get_string(config, nconfig::PARAM_ID_AP_PASSWORD, ap_password);
 
                     nwifi::begin_AP(ap_ssid.m_const, ap_password.m_const);
 
@@ -220,7 +221,7 @@ namespace ncore
                             nserial::println("Access Point, received message from connected client");
                             str_t outKey;
                             str_t outValue;
-                            while (nvstore::parse_keyvalue(msg, outKey, outValue))
+                            while (nconfig::parse_keyvalue(msg, outKey, outValue))
                             {
                                 const s16 index = nameToIndex(outKey);
                                 nserial::print("Parse ");
@@ -231,7 +232,7 @@ namespace ncore
                                 nserial::print((s32)index);
                                 nserial::println("");
 
-                                nvstore::parse_value(config, index, outValue);
+                                nconfig::parse_value(config, index, outValue);
                             }
                             str_clear(msg);
 
@@ -241,10 +242,10 @@ namespace ncore
                             str_t remote_server = str_empty();
                             s32   remote_port   = 0;
 
-                            nvstore::get_string(config, nvstore::PARAM_ID_WIFI_SSID, ssid);
-                            nvstore::get_string(config, nvstore::PARAM_ID_WIFI_PASSWORD, pass);
-                            nvstore::get_string(config, nvstore::PARAM_ID_REMOTE_SERVER, remote_server);
-                            nvstore::get_int(config, nvstore::PARAM_ID_REMOTE_PORT, remote_port);
+                            nconfig::get_string(config, nconfig::PARAM_ID_WIFI_SSID, ssid);
+                            nconfig::get_string(config, nconfig::PARAM_ID_WIFI_PASSWORD, pass);
+                            nconfig::get_string(config, nconfig::PARAM_ID_REMOTE_SERVER, remote_server);
+                            nconfig::get_int(config, nconfig::PARAM_ID_REMOTE_PORT, remote_port);
 
                             nserial::println("Access point, new configuration:");
                             nserial::print("    SSID: ");
@@ -265,7 +266,7 @@ namespace ncore
                                 nwifi::disconnect_AP(false);  // Stop the access point
 
                                 nserial::println("Access point, new configuration approved.");
-                                nvstore::save(config);  // Save the configuration to non-volatile storage
+                                nconfig::save(config);  // Save the configuration to non-volatile storage
 
                                 sState              = NODE_WIFI_CONNECTING;
                                 sWiFiConnectState   = WIFI_CONNECT_BEGIN;
@@ -330,7 +331,7 @@ namespace ncore
             return sState == NODE_CONNECTED;
         }
 
-        void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        void node_setup(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
             sWiFiConnectState   = WIFI_CONNECT_BEGIN;
             sRemoteConnectState = REMOTE_CONNECT_BEGIN;
@@ -343,7 +344,280 @@ namespace ncore
                 node_update(config, nameToIndex);
         }
 
-        bool node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str)) { return config != nullptr && node_update(config, nameToIndex); }
+        bool node_loop(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str)) { return config != nullptr && node_update(config, nameToIndex); }
+
+        // ----------------------------------------------------------------
+        // ----------------------------------------------------------------
+        // scheduler based version
+        // ----------------------------------------------------------------
+        // ----------------------------------------------------------------
+        struct state_node_t
+        {
+        };
+
+        ntask::result_t func_configure_start(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        {
+            nwifi::disconnect();
+            nwifi::set_mode_AP();
+
+            // Start the access point to receive configuration
+            str_t ap_ssid = str_const("esp32");
+            nconfig::get_string(config, nconfig::PARAM_ID_AP_SSID, ap_ssid);
+            str_t ap_password = str_const("1234");
+            nconfig::get_string(config, nconfig::PARAM_ID_AP_PASSWORD, ap_password);
+
+            nwifi::begin_AP(ap_ssid.m_const, ap_password.m_const);
+
+            nserial::println("Access Point started to receive configuration");
+
+            // Start the TCP server to receive configuration data
+            ntcp::server_start(31337);
+            return ntask::RESULT_DONE;
+        }
+
+        ntask::result_t func_configure_loop(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        {
+            ntcp::client_t client = ntcp::server_handle_client();
+            if (client != nullptr)
+            {
+                char  msgBytes[256];
+                str_t msg = str_mutable(msgBytes, 256);
+
+                ntcp::client_recv_msg(client, msg);
+                if (str_len(msg) > 0)
+                {
+                    nserial::println("Access Point, received message from connected client");
+                    str_t outKey;
+                    str_t outValue;
+                    while (nconfig::parse_keyvalue(msg, outKey, outValue))
+                    {
+                        const s16 index = nameToIndex(outKey);
+                        nserial::print("Parse ");
+                        str_print(outKey);
+                        nserial::print(" = ");
+                        str_print(outValue);
+                        nserial::print(", index = ");
+                        nserial::print((s32)index);
+                        nserial::println("");
+
+                        nconfig::parse_value(state->config, index, outValue);
+                    }
+                    str_clear(msg);
+
+                    // Check if we have valid WiFi configuration
+                    str_t ssid          = str_empty();
+                    str_t pass          = str_empty();
+                    str_t remote_server = str_empty();
+                    s32   remote_port   = 0;
+
+                    nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_SSID, ssid);
+                    nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_PASSWORD, pass);
+                    nconfig::get_string(state->config, nconfig::PARAM_ID_REMOTE_SERVER, remote_server);
+                    nconfig::get_int(state->config, nconfig::PARAM_ID_REMOTE_PORT, remote_port);
+
+                    nserial::println("Access point, new configuration:");
+                    nserial::print("    SSID: ");
+                    nserial::println(ssid.m_const);
+                    nserial::print("    PASSWORD: ");
+                    nserial::println(pass.m_const);
+                    nserial::print("    REMOTE_SERVER: ");
+                    nserial::println(remote_server.m_const);
+                    nserial::print("    REMOTE_PORT: ");
+                    nserial::print(remote_port);
+                    nserial::println("");
+
+                    const bool valid_wifi_config   = is_valid_SSID(ssid) && is_valid_password(pass);
+                    const bool valid_server_config = is_valid_IPAddress(remote_server) && is_valid_port(remote_port);
+                    if (valid_wifi_config && valid_server_config)
+                    {
+                        ntcp::server_stop();          // Stop the TCP server
+                        nwifi::disconnect_AP(false);  // Stop the access point
+
+                        nserial::println("Access point, new configuration approved.");
+                        nconfig::save(state->config);  // Save the configuration to non-volatile storage
+
+                        return ntask::RESULT_DONE;
+                    }
+                    else
+                    {
+                        nserial::println("Access point, invalid configuration received, waiting for new configuration.");
+                    }
+                }
+
+                return ntask::RESULT_OK;
+            }
+        }
+
+        ntask::result_t func_connect_to_WiFi_start(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        {
+            // TODO, can we check the state of the WiFi system, perhaps it is still in STATION mode and connected?
+
+            nwifi::set_mode_STA();  // Set WiFi to station mode
+
+            str_t ssid;
+            if (!nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_SSID, ssid))
+                return ntask::RESULT_ERROR;
+            str_t pass;
+            if (!nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_PASSWORD, pass))
+                return ntask::RESULT_ERROR;
+
+            nserial::println("Connecting to WiFi.");
+            nwifi::begin_encrypted(ssid.m_const, pass.m_const);  // Connect to WiFi
+            return ntask::RESULT_DONE;
+        }
+
+        ntask::result_t func_wifi_is_connected(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        {
+            if (nwifi::status() == nstatus::Connected)
+            {
+                nserial::println("  -> Connected");
+                return ntask::RESULT_DONE;
+            }
+
+            return ntask::RESULT_OK;
+        }
+
+        ntask::result_t func_connect_to_remote_start(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        {
+            nremote::stop();  // Stop any existing client connection
+            if (nwifi::status() != nstatus::Connected)
+            {
+                nserial::println("  -> Connecting to remote stopped, WiFi not connected.");
+                return ntask::RESULT_ERROR;
+            }
+
+            nserial::println("Connecting to remote.");
+            return ntask::RESULT_DONE;
+        }
+
+        ntask::result_t func_remote_is_connected(ntask::scheduler_t* scheduler, ntask::state_t* state)
+        {
+            nconfig::config_t* config = state->config;
+
+            str_t remote_server;
+            if (!nconfig::get_string(config, nconfig::PARAM_ID_REMOTE_SERVER, remote_server))
+            {
+                nserial::println("  -> Remote server parameter not available.");
+                return ntask::RESULT_ERROR;
+            }
+            s32 remote_port = 0;
+            if (!nconfig::get_int(config, nconfig::PARAM_ID_REMOTE_PORT, remote_port))
+            {
+                nserial::println("  -> Remote server port parameter not available.");
+                return ntask::RESULT_ERROR;
+            }
+
+            nstatus::status_t clientStatus = nremote::connect(remote_server.m_const, remote_port, 8000);
+            if (clientStatus == nstatus::Connected)
+            {
+                nserial::println("  -> Connected to remote.");
+
+                IPAddress_t localIP = nremote::local_IP();
+                nserial::print("     IP: ");
+                nserial::print(localIP);
+                nserial::println("");
+
+                MACAddress_t mac = nwifi::mac_address();
+                nserial::print("     MAC: ");
+                nserial::print(mac);
+                nserial::println("");
+
+                npacket::packet_t macPacket;
+                macPacket.begin(0, true);
+                const u64 macValue = mac.m_address[0] | (u64(mac.m_address[1]) << 8) | (u64(mac.m_address[2]) << 16) | (u64(mac.m_address[3]) << 24) | (u64(mac.m_address[4]) << 32) | (u64(mac.m_address[5]) << 40);
+                macPacket.write_value(npacket::ntype::MacAddress, macValue);
+                macPacket.finalize();
+
+                nremote::write(macPacket.Data, macPacket.Size);
+                sNodeTimeSync = ntimer::millis();
+
+                return ntask::RESULT_DONE;
+            }
+
+            return ntask::RESULT_OK;
+        }
+
+        void schedule_connect(ntask::scheduler_t* scheduler, ntask::program_t main, ntask::state_t* state)
+        {
+            ntask::program_t node_configure_program  = scheduler->program();
+            ntask::program_t node_connected_program  = scheduler->program();
+            ntask::program_t node_connecting_program = scheduler->program();
+
+            // The configure program will start the access point and TCP server to receive configuration data
+            // When valid configuration is received it will jump to the connecting program, otherwise it will
+            // keep waiting for valid configuration.
+            //
+            // TODO Do we need a timeout on this program, that no matter what we jump to the connecting program
+            //      to try to connect to WiFi and Remote?
+            scheduler->xbegin(node_configure_program);
+            {
+                scheduler->xonce(func_configure_start);
+                scheduler->xif(func_configure_loop);
+                {
+                    scheduler->xjump(node_connecting_program);
+                }
+                scheduler->xend();
+            }
+            scheduler->xend();
+
+            // When the program is fully connected, we run this program that
+            // checks if we are still connected both to WiFi and the Remote.
+            // If not we jump to the connecting program to reconnect.
+            // If both are connected we also call the main program.
+            scheduler->xbegin(node_connected_program);
+            {
+                scheduler->xif(func_wifi_is_connected);
+                {
+                    scheduler->xif(func_remote_is_connected);
+                    {
+                        scheduler->xrun(main);
+                        scheduler->xreturn();
+                    }
+                    scheduler->xend();
+
+                    scheduler->xjump(node_connecting_program);
+                }
+                scheduler->xend();
+
+                scheduler->xjump(node_connecting_program);
+            }
+            scheduler->xend();
+
+            // The connecting program will first try to connect to WiFi, when connected
+            // it will try to connect to the Remote. If both are connected we jump to
+            // the connected program. If we time out trying to connect to either WiFi or Remote
+            // we jump to the configure program to start over.
+            scheduler->xbegin(node_connecting_program);
+            {
+                scheduler->xonce(func_connect_to_WiFi_start);
+                scheduler->xif(func_wifi_is_connected);
+                {
+                    scheduler->xonce(func_connect_to_remote_start);
+
+                    scheduler->xif(func_remote_is_connected);
+                    {
+                        scheduler->xjump(node_connected_program);
+                    }
+                    scheduler->xend();
+
+                    scheduler->xif(ntask::timeout_t(60000));
+                    {
+                        scheduler->xjump(node_configure_program);
+                    }
+                    scheduler->xend();
+
+                    scheduler->xreturn();
+                }
+                scheduler->xend();
+
+                scheduler->xif(ntask::timeout_t(60000));
+                {
+                    scheduler->xjump(node_configure_program);
+                }
+                scheduler->xend();
+            }
+            scheduler->xend();
+        }
 
     }  // namespace nwifi
 }  // namespace ncore
@@ -356,12 +630,12 @@ namespace ncore
 {
     namespace nwifi
     {
-        void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        void node_setup(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
             // No setup needed for non-ESP32 platforms
         }
 
-        bool node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str))
+        bool node_loop(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str))
         {
             // No loop needed for non-ESP32 platforms
             return true;

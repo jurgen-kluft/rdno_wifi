@@ -1,16 +1,17 @@
-#ifndef __RDNO_CORE_WIFI_NODE_H__
-#define __RDNO_CORE_WIFI_NODE_H__
+#ifndef __RDNO_CORE_NODE_H__
+#define __RDNO_CORE_NODE_H__
 #include "rdno_core/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
 #endif
 
 #include "rdno_core/c_network.h"
-#include "rdno_core/c_nvstore.h"
+#include "rdno_core/c_config.h"
+#include "rdno_core/c_task.h"
 
 namespace ncore
 {
-    namespace nwifi
+    namespace nnode
     {
         namespace nparam
         {
@@ -29,12 +30,14 @@ namespace ncore
 
         // UpdateConfig updates the WiFi configuration by receiving and parsing TCP packets
         // from the AP access point.
-        void node_setup(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
-        bool node_loop(nvstore::config_t* config, s16 (*nameToIndex)(str_t const& str));
 
-        u64 node_timesync();
+        // void node_setup(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str));
+        // bool node_loop(nconfig::config_t* config, s16 (*nameToIndex)(str_t const& str));
+        // u64 node_timesync();
 
-    }  // namespace nwifi
+        void schedule_connect(ntask::scheduler_t* scheduler, ntask::function_t onConnected, ntask::state_t* state);
+
+    }  // namespace nnode
 }  // namespace ncore
 
-#endif  // __RDNO_CORE_WIFI_NODE_H__
+#endif  // __RDNO_CORE_NODE_H__
