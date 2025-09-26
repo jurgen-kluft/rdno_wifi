@@ -5,8 +5,9 @@
 
 #    include "rdno_core/c_app.h"
 #    include "rdno_core/c_config.h"
-#    include "rdno_core/c_nvstore.h"
 #    include "rdno_core/c_packet.h"
+#    include "rdno_core/c_network.h"
+#    include "rdno_core/c_nvstore.h"
 #    include "rdno_core/c_serial.h"
 #    include "rdno_core/c_str.h"
 #    include "rdno_core/c_task.h"
@@ -359,9 +360,6 @@ namespace ncore
         // ntask based version
         // ----------------------------------------------------------------
         // ----------------------------------------------------------------
-        struct state_node_t
-        {
-        };
 
         ntask::result_t func_configure_start(ntask::state_t* state)
         {
@@ -463,7 +461,6 @@ namespace ncore
         {
             if (nwifi::status() == nstatus::Connected)
             {
-                nserial::println("  -> Connected");
                 return ntask::RESULT_DONE;
             }
 
@@ -489,7 +486,7 @@ namespace ncore
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_remote_is_connected(ntask::state_t* state)
+        ntask::result_t func_remote_connecting(ntask::state_t* state)
         {
             nconfig::config_t* config = state->config;
 
@@ -506,7 +503,10 @@ namespace ncore
                 return ntask::RESULT_ERROR;
             }
 
-            nstatus::status_t clientStatus = nremote::connect(remote_server.m_const, remote_port, 8000);
+            IPAddress_t remote_server_ip_address;
+            from_string(remote_server, remote_server_ip_address);
+
+            nstatus::status_t clientStatus = nremote::connect(remote_server_ip_address, remote_port, 8000);
             if (clientStatus == nstatus::Connected)
             {
                 nserial::println("  -> Connected to remote.");
@@ -536,6 +536,16 @@ namespace ncore
 
             return ntask::RESULT_OK;
         }
+
+        ntask::result_t func_remote_is_connected(ntask::state_t* state)
+        {
+            if (nremote::connected() == nstatus::Connected)
+            {
+                return ntask::RESULT_DONE;
+            }
+
+            return ntask::RESULT_OK;
+        }        
 
         void connected(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state)
         {
@@ -609,7 +619,7 @@ namespace ncore
                 {
                     xonce(scheduler, func_connect_to_remote_start);
 
-                    xif(scheduler, func_remote_is_connected);
+                    xif(scheduler, func_remote_connecting);
                     {
                         xjump(scheduler, node_connected_program);
                     }

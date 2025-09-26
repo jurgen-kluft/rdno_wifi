@@ -1,6 +1,7 @@
 # rdno_wifi
 
-This library provides a 'node' for connecting to WiFi networks using the ESP32 microcontroller. It simplifies the process of connecting to a WiFi network by handling the connection logic and providing a simple interface for users.
+This library provides a 'node' for connecting to a WiFi network and Remote Server. It simplifies the process of connecting to a WiFi network by handling the connection logic and providing a simple interface for users.
+
 It also uses non-volatile storage to load/save a configuration that can be setup by the user, it should provide the SSID and password, AP SSID and AP Password, remote server address and port, and any additional parameters that the application may need.
 
 The boot process is as follows:
@@ -13,5 +14,5 @@ The boot process is as follows:
 
 Example message format:
 ```
-SSID=MyWiFiNetwork, PASSWORD=MyPassword, AP_SSID=MyAP, AP_PASSWORD=MyAPPassword, REMOTE_SERVER=10.0.0.42, REMOTE_PORT=31337
+ssid=MyWiFiNetwork, password=MyPassword, ap_ssid=MyAP, ap_password=MyAPPassword, remote_server=10.0.0.42, remote_port=31337
 ```
