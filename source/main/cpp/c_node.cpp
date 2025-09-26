@@ -552,9 +552,9 @@ namespace ncore
 
         void connected(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state)
         {
-            ntask::program_t node_configure_program  = program(scheduler);
-            ntask::program_t node_connected_program  = program(scheduler);
-            ntask::program_t node_connecting_program = program(scheduler);
+            ntask::program_t node_configure_program  = ntask::program(scheduler, "configuration program");
+            ntask::program_t node_connected_program  = ntask::program(scheduler, "connected program");
+            ntask::program_t node_connecting_program = ntask::program(scheduler, "connecting program");
 
             // Start the node program by jumping to the connecting program
             ntask::boot(scheduler, node_connecting_program);
