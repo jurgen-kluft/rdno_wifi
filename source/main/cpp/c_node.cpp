@@ -365,7 +365,6 @@ namespace ncore
 
         ntask::result_t func_configure_start(ntask::state_t* state)
         {
-            nwifi::disconnect();
             nwifi::set_mode_AP();
 
             // Start the access point to receive configuration
@@ -399,16 +398,9 @@ namespace ncore
                     str_t outValue;
                     while (nconfig::parse_keyvalue(msg, outKey, outValue))
                     {
-                        //const s16 index = nameToIndex(outKey);
+                        // const s16 index = nameToIndex(outKey);
                         const s16 index = napp::config_key_to_index(outKey);
-                        nserial::print("Parse ");
-                        str_print(outKey);
-                        nserial::print(" = ");
-                        str_print(outValue);
-                        nserial::print(", index = ");
-                        nserial::print((s32)index);
-                        nserial::println("");
-
+                        nserial::printf("Parse %s = %s, index = %d\n", va_t(outKey.m_const + outKey.m_str), va_t(outValue.m_const + outValue.m_str), va_t(index));
                         nconfig::parse_value(state->config, index, outValue);
                     }
                     str_clear(msg);
@@ -424,16 +416,7 @@ namespace ncore
                     nconfig::get_string(state->config, nconfig::PARAM_ID_REMOTE_SERVER, remote_server);
                     nconfig::get_int(state->config, nconfig::PARAM_ID_REMOTE_PORT, remote_port);
 
-                    nserial::println("Access point, new configuration:");
-                    nserial::print("    SSID: ");
-                    nserial::println(ssid.m_const);
-                    nserial::print("    PASSWORD: ");
-                    nserial::println(pass.m_const);
-                    nserial::print("    REMOTE_SERVER: ");
-                    nserial::println(remote_server.m_const);
-                    nserial::print("    REMOTE_PORT: ");
-                    nserial::print(remote_port);
-                    nserial::println("");
+                    nserial::printf("Access point, new configuration:\n    SSID: %s\n    PASSWORD: %s\n    REMOTE_SERVER: %s\n    REMOTE_PORT: %d\n", va_t(ssid.m_const + ssid.m_str), va_t(pass.m_const + pass.m_str), va_t(remote_server.m_const + remote_server.m_str), va_t(remote_port));
 
                     const bool valid_wifi_config   = is_valid_SSID(ssid) && is_valid_password(pass);
                     const bool valid_server_config = is_valid_IPAddress(remote_server) && is_valid_port(remote_port);
@@ -470,7 +453,8 @@ namespace ncore
             if (!nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_PASSWORD, pass))
                 return ntask::RESULT_ERROR;
 
-            nserial::println("Connecting to WiFi.");
+            nserial::println("Connecting to WiFi...");
+
             nwifi::begin_encrypted(ssid.m_const, pass.m_const);  // Connect to WiFi
             return ntask::RESULT_DONE;
         }
@@ -486,6 +470,12 @@ namespace ncore
             return ntask::RESULT_OK;
         }
 
+        ntask::result_t func_wifi_disconnect(ntask::state_t* state)
+        {
+            nwifi::disconnect();
+            return ntask::RESULT_DONE;
+        }
+
         ntask::result_t func_connect_to_remote_start(ntask::state_t* state)
         {
             nremote::stop();  // Stop any existing client connection
@@ -499,7 +489,7 @@ namespace ncore
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_remote_is_connected( ntask::state_t* state)
+        ntask::result_t func_remote_is_connected(ntask::state_t* state)
         {
             nconfig::config_t* config = state->config;
 
@@ -538,7 +528,7 @@ namespace ncore
                 macPacket.finalize();
 
                 nremote::write(macPacket.Data, macPacket.Size);
-                state->time_ms = ntimer::millis();
+                state->time_ms   = ntimer::millis();
                 state->time_sync = ntimer::millis();
 
                 return ntask::RESULT_DONE;
@@ -555,16 +545,29 @@ namespace ncore
 
             boot(scheduler, node_connecting_program);
 
-            // The configure program will start the access point and TCP server to receive configuration data
+            // The configure program will start an access point and TCP server to receive configuration data.
             // When valid configuration is received it will jump to the connecting program, otherwise it will
             // keep waiting for valid configuration.
-            //
+            // Once the connecting program is started it will try to connect to WiFi and the Remote, when both
+            // are connected it will jump to the connected program.
+            // The connected program will check if we are still connected to both WiFi and Remote, and will
+            // call the main program. If either WiFi or Remote are disconnected it will jump to the connecting
+            // program to reconnect.
+
             // TODO Do we need a timeout on this program, that no matter what we jump to the connecting program
             //      to try to connect to WiFi and Remote?
             xbegin(scheduler, node_configure_program);
             {
                 xonce(scheduler, func_configure_start);
                 xif(scheduler, func_configure_loop);
+                {
+                    xjump(scheduler, node_connecting_program);
+                }
+                xend(scheduler);
+
+                // If we time out while waiting for configuration, we jump to the connecting program
+                // Note: Currently set to 5 minutes
+                xif(scheduler, ntask::timeout_t(5 * 60 * 1000));
                 {
                     xjump(scheduler, node_connecting_program);
                 }
@@ -614,6 +617,7 @@ namespace ncore
 
                     xif(scheduler, ntask::timeout_t(60000));
                     {
+                        xonce(scheduler, func_wifi_disconnect);
                         xjump(scheduler, node_configure_program);
                     }
                     xend(scheduler);
@@ -624,6 +628,7 @@ namespace ncore
 
                 xif(scheduler, ntask::timeout_t(60000));
                 {
+                    xonce(scheduler, func_wifi_disconnect);
                     xjump(scheduler, node_configure_program);
                 }
                 xend(scheduler);
@@ -642,10 +647,7 @@ namespace ncore
 {
     namespace nnode
     {
-        void connected(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state) 
-        { 
-            boot(scheduler, main); 
-        }
+        void connected(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state) { boot(scheduler, main); }
 
     }  // namespace nnode
 }  // namespace ncore
