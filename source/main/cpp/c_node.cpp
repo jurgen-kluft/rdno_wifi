@@ -372,8 +372,7 @@ namespace ncore
             nconfig::get_string(state->config, nconfig::PARAM_ID_AP_PASSWORD, ap_password);
 
             nwifi::begin_AP(ap_ssid.m_const, ap_password.m_const);
-
-            nserial::println("Access Point started to receive configuration");
+            nserial::printf("AP started on %s to receive configuration\n", va_t(ap_ssid.m_const));
 
             // Start the TCP server to receive configuration data
             ntcp::server_start(31337);
@@ -451,9 +450,10 @@ namespace ncore
             if (!nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_PASSWORD, pass))
                 return ntask::RESULT_ERROR;
 
-            nserial::println("Connecting to WiFi...");
+            nserial::printf("Connecting to WiFi with SSID %s ...\n", va_t(ssid.m_const));
 
             nwifi::begin_encrypted(ssid.m_const, pass.m_const);  // Connect to WiFi
+            
             return ntask::RESULT_DONE;
         }
 
@@ -476,6 +476,7 @@ namespace ncore
         ntask::result_t func_connect_to_remote_start(ntask::state_t* state)
         {
             nremote::stop();  // Stop any existing client connection
+
             if (nwifi::status() != nstatus::Connected)
             {
                 nserial::println("  -> Connecting to remote stopped, WiFi not connected.");
@@ -505,6 +506,8 @@ namespace ncore
 
             IPAddress_t remote_server_ip_address;
             from_string(remote_server, remote_server_ip_address);
+
+            nserial::printf("Connecting to %s:%d (IP: %d.%d.%d.%d) ...\n", va_t(remote_server.m_const), va_t(remote_port), va_t(remote_server_ip_address.m_address[0]), va_t(remote_server_ip_address.m_address[1]), va_t(remote_server_ip_address.m_address[2]), va_t(remote_server_ip_address.m_address[3]));
 
             nstatus::status_t clientStatus = nremote::connect(remote_server_ip_address, remote_port, 8000);
             if (clientStatus == nstatus::Connected)
@@ -553,7 +556,8 @@ namespace ncore
             ntask::program_t node_connected_program  = program(scheduler);
             ntask::program_t node_connecting_program = program(scheduler);
 
-            boot(scheduler, node_connecting_program);
+            // Start the node program by jumping to the connecting program
+            ntask::boot(scheduler, node_connecting_program);
 
             // The configure program will start an access point and TCP server to receive configuration data.
             // When valid configuration is received it will jump to the connecting program, otherwise it will
@@ -566,84 +570,84 @@ namespace ncore
 
             // TODO Do we need a timeout on this program, that no matter what we jump to the connecting program
             //      to try to connect to WiFi and Remote?
-            xbegin(scheduler, node_configure_program);
+            ntask::xbegin(scheduler, node_configure_program);
             {
-                xonce(scheduler, func_configure_start);
-                xif(scheduler, func_configure_loop);
+                ntask::xonce(scheduler, func_configure_start);
+                ntask::xif(scheduler, func_configure_loop);
                 {
-                    xjump(scheduler, node_connecting_program);
+                    ntask::xjump(scheduler, node_connecting_program);
                 }
-                xend(scheduler);
+                ntask::xend(scheduler);
 
                 // If we time out while waiting for configuration, we jump to the connecting program
                 // Note: Currently set to 5 minutes
-                xif(scheduler, ntask::timeout_t(5 * 60 * 1000));
+                ntask::xif(scheduler, ntask::timeout_t(5 * 60 * 1000));
                 {
-                    xjump(scheduler, node_connecting_program);
+                    ntask::xjump(scheduler, node_connecting_program);
                 }
-                xend(scheduler);
+                ntask::xend(scheduler);
             }
-            xend(scheduler);
+            ntask::xend(scheduler);
 
             // When the program is fully connected, we run this program that
             // checks if we are still connected both to WiFi and the Remote.
             // If not we jump to the connecting program to reconnect.
             // If both are connected we also call the main program.
-            xbegin(scheduler, node_connected_program);
+            ntask::xbegin(scheduler, node_connected_program);
             {
-                xif(scheduler, func_wifi_is_connected);
+                ntask::xif(scheduler, func_wifi_is_connected);
                 {
-                    xif(scheduler, func_remote_is_connected);
+                    ntask::xif(scheduler, func_remote_is_connected);
                     {
-                        xrun(scheduler, main);
-                        xreturn(scheduler);
+                        ntask::xrun(scheduler, main);
+                        ntask::xreturn(scheduler);
                     }
-                    xend(scheduler);
+                    ntask::xend(scheduler);
 
-                    xjump(scheduler, node_connecting_program);
+                    ntask::xjump(scheduler, node_connecting_program);
                 }
-                xend(scheduler);
+                ntask::xend(scheduler);
 
-                xjump(scheduler, node_connecting_program);
+                ntask::xjump(scheduler, node_connecting_program);
             }
-            xend(scheduler);
+            ntask::xend(scheduler);
 
             // The connecting program will first try to connect to WiFi, when connected
             // it will try to connect to the Remote. If both are connected we jump to
             // the connected program. If we time out trying to connect to either WiFi or Remote
             // we jump to the configure program to start over.
-            xbegin(scheduler, node_connecting_program);
+            ntask::xbegin(scheduler, node_connecting_program);
             {
-                xonce(scheduler, func_connect_to_WiFi_start);
-                xif(scheduler, func_wifi_is_connected);
+                ntask::xonce(scheduler, func_connect_to_WiFi_start);
+                ntask::xif(scheduler, func_wifi_is_connected);
                 {
-                    xonce(scheduler, func_connect_to_remote_start);
+                    ntask::xonce(scheduler, func_connect_to_remote_start);
 
-                    xif(scheduler, func_remote_connecting);
+                    ntask::xif(scheduler, func_remote_connecting);
                     {
-                        xjump(scheduler, node_connected_program);
+                        ntask::xjump(scheduler, node_connected_program);
                     }
-                    xend(scheduler);
+                    ntask::xend(scheduler);
 
-                    xif(scheduler, ntask::timeout_t(60000));
+                    ntask::xif(scheduler, ntask::timeout_t(60000));
                     {
-                        xonce(scheduler, func_wifi_disconnect);
-                        xjump(scheduler, node_configure_program);
+                        ntask::xonce(scheduler, func_wifi_disconnect);
+                        ntask::xjump(scheduler, node_configure_program);
                     }
-                    xend(scheduler);
+                    ntask::xend(scheduler);
 
-                    xreturn(scheduler);
+                    ntask::xreturn(scheduler);
                 }
-                xend(scheduler);
+                ntask::xend(scheduler);
 
-                xif(scheduler, ntask::timeout_t(60000));
+                ntask::xif(scheduler, ntask::timeout_t(60000));
                 {
-                    xonce(scheduler, func_wifi_disconnect);
-                    xjump(scheduler, node_configure_program);
+                    ntask::xonce(scheduler, func_wifi_disconnect);
+                    ntask::xjump(scheduler, node_configure_program);
                 }
-                xend(scheduler);
+                ntask::xend(scheduler);
             }
-            xend(scheduler);
+            ntask::xend(scheduler);
         }
 
     }  // namespace nnode
