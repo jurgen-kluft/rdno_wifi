@@ -22,7 +22,7 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(networkpkg)
 
 	// esp32 library
-	esp32wifilib := denv.SetupCppLibProjectForArduino(mainpkg, name+"_arduino")
+	esp32wifilib := denv.SetupCppLibProjectForArduinoEsp32(mainpkg, name+"_arduino")
 	esp32wifilib.AddEnvironmentVariable("ESP_SDK")
 	esp32wifilib.AddInclude("{ESP_SDK}", "libraries/WiFi", "src")
 	esp32wifilib.SourceFilesFrom("{ESP_SDK}", "libraries/WiFi", "src")

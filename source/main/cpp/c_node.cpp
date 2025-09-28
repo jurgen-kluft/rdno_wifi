@@ -524,13 +524,6 @@ namespace ncore
                 nserial::print(mac);
                 nserial::println("");
 
-                npacket::packet_t macPacket;
-                macPacket.begin(0, true);
-                const u64 macValue = mac.m_address[0] | (u64(mac.m_address[1]) << 8) | (u64(mac.m_address[2]) << 16) | (u64(mac.m_address[3]) << 24) | (u64(mac.m_address[4]) << 32) | (u64(mac.m_address[5]) << 40);
-                macPacket.write_value(npacket::ntype::MacAddress, macValue);
-                macPacket.finalize();
-
-                nremote::write(macPacket.Data, macPacket.Size);
                 state->time_ms   = ntimer::millis();
                 state->time_sync = ntimer::millis();
 
