@@ -406,12 +406,12 @@ namespace ncore
                     str_t ssid          = str_empty();
                     str_t pass          = str_empty();
                     str_t remote_server = str_empty();
-                    s32   remote_port   = 0;
+                    u16   remote_port   = 0;
 
                     nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_SSID, ssid);
                     nconfig::get_string(state->config, nconfig::PARAM_ID_WIFI_PASSWORD, pass);
                     nconfig::get_string(state->config, nconfig::PARAM_ID_REMOTE_SERVER, remote_server);
-                    nconfig::get_int(state->config, nconfig::PARAM_ID_REMOTE_PORT, remote_port);
+                    nconfig::get_uint16(state->config, nconfig::PARAM_ID_REMOTE_PORT, remote_port);
 
                     nserial::printf("Access point, new configuration:\n    SSID: %s\n    PASSWORD: %s\n    REMOTE_SERVER: %s\n    REMOTE_PORT: %d\n", va_t(ssid.m_const + ssid.m_str), va_t(pass.m_const + pass.m_str), va_t(remote_server.m_const + remote_server.m_str), va_t(remote_port));
 
@@ -497,8 +497,8 @@ namespace ncore
                 nserial::println("  -> Remote server parameter not available.");
                 return ntask::RESULT_ERROR;
             }
-            s32 remote_port = 0;
-            if (!nconfig::get_int(config, nconfig::PARAM_ID_REMOTE_PORT, remote_port))
+            u16 remote_port = 0;
+            if (!nconfig::get_uint16(config, nconfig::PARAM_ID_REMOTE_PORT, remote_port))
             {
                 nserial::println("  -> Remote server port parameter not available.");
                 return ntask::RESULT_ERROR;

@@ -2,6 +2,7 @@ package rdno_wifi
 
 import (
 	denv "github.com/jurgen-kluft/ccode/denv"
+	rdno_core "github.com/jurgen-kluft/rdno_core/package"
 )
 
 // rdno_wifi is the WiFi package for Arduino Esp32/Esp8266 projects.
@@ -14,39 +15,36 @@ func GetPackage() *denv.Package {
 	name := repo_name
 
 	// dependencies
-	// networkpkg := rdno_network.GetPackage()
+	corepkg := rdno_core.GetPackage()
 
 	// main package
 	mainpkg := denv.NewPackage(repo_path, repo_name)
-	//mainpkg.AddPackage(networkpkg)
+	mainpkg.AddPackage(corepkg)
 
 	// esp32 library
-	esp32wifilib := denv.SetupCppLibProjectForArduinoEsp32(mainpkg, name+"_arduino")
+	esp32wifilib := denv.SetupCppLibProjectForArduinoEsp32(mainpkg, name+"_arduino_esp32")
+	esp32wifilib.AddDependencies(corepkg.GetMainLib())
 	esp32wifilib.AddEnvironmentVariable("ESP32_SDK")
 	esp32wifilib.AddInclude("{ESP32_SDK}", "libraries/WiFi", "src")
+	esp32wifilib.AddInclude("{ESP32_SDK}", "libraries/Network", "src")
 	esp32wifilib.SourceFilesFrom("{ESP32_SDK}", "libraries/WiFi", "src")
-	//esp32wifilib.AddDependencies(networkpkg.GetMainLib())
+	esp32wifilib.SourceFilesFrom("{ESP32_SDK}", "libraries/Network", "src")
 
 	// esp8266 library
-	esp8266wifilib := denv.SetupCppLibProjectForArduinoEsp8266(mainpkg, name+"_arduino")
+	esp8266wifilib := denv.SetupCppLibProjectForArduinoEsp8266(mainpkg, name+"_arduino_esp8266")
+	esp8266wifilib.AddDependencies(corepkg.GetMainLib())
 	esp8266wifilib.AddEnvironmentVariable("ESP8266_SDK")
-	esp8266wifilib.AddInclude("{ESP8266_SDK}", "libraries/ESP2866WiFi", "src")
-	esp8266wifilib.SourceFilesFrom("{ESP8266_SDK}", "libraries/ESP2866WiFi", "src")
-	//esp8266wifilib.AddDependencies(networkpkg.GetMainLib())
+	esp8266wifilib.AddInclude("{ESP8266_SDK}", "libraries/ESP8266WiFi", "src")
+	esp8266wifilib.SourceFilesFrom("{ESP8266_SDK}", "libraries/ESP8266WiFi", "src")
 
 	// main library
 	mainlib := denv.SetupCppLibProject(mainpkg, name)
-	//mainlib.AddDependencies(networkpkg.GetMainLib())
+	mainlib.AddDependencies(corepkg.GetMainLib())
 	mainlib.AddDependency(esp32wifilib)
 	mainlib.AddDependency(esp8266wifilib)
-
-	// test library
-	testlib := denv.SetupCppTestLibProject(mainpkg, name)
-	//testlib.AddDependencies(networkpkg.GetTestLib())
 
 	mainpkg.AddMainLib(mainlib)
 	mainpkg.AddMainLib(esp32wifilib)
 	mainpkg.AddMainLib(esp8266wifilib)
-	mainpkg.AddTestLib(testlib)
 	return mainpkg
 }
