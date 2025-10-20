@@ -22,20 +22,20 @@ func GetPackage() *denv.Package {
 	mainpkg.AddPackage(corepkg)
 
 	// esp32 library
-	esp32wifilib := denv.SetupCppLibProjectForArduinoEsp32(mainpkg, name+"_arduino_esp32")
+	esp32wifilib := denv.SetupCppLibProjectForArduinoEsp32(mainpkg, name+"-esp32")
 	esp32wifilib.AddDependencies(corepkg.GetMainLib())
 	esp32wifilib.AddEnvironmentVariable("ESP32_SDK")
 	esp32wifilib.AddInclude("{ESP32_SDK}", "libraries/WiFi", "src")
 	esp32wifilib.AddInclude("{ESP32_SDK}", "libraries/Network", "src")
-	esp32wifilib.SourceFilesFrom("{ESP32_SDK}", "libraries/WiFi", "src")
-	esp32wifilib.SourceFilesFrom("{ESP32_SDK}", "libraries/Network", "src")
+	esp32wifilib.SourceFilesFrom("{ESP32_SDK}", "libraries/WiFi", "src", ".cpp")
+	esp32wifilib.SourceFilesFrom("{ESP32_SDK}", "libraries/Network", "src", ".cpp")
 
 	// esp8266 library
-	esp8266wifilib := denv.SetupCppLibProjectForArduinoEsp8266(mainpkg, name+"_arduino_esp8266")
+	esp8266wifilib := denv.SetupCppLibProjectForArduinoEsp8266(mainpkg, name+"-esp8266")
 	esp8266wifilib.AddDependencies(corepkg.GetMainLib())
 	esp8266wifilib.AddEnvironmentVariable("ESP8266_SDK")
 	esp8266wifilib.AddInclude("{ESP8266_SDK}", "libraries/ESP8266WiFi", "src")
-	esp8266wifilib.SourceFilesFrom("{ESP8266_SDK}", "libraries/ESP8266WiFi", "src")
+	esp8266wifilib.SourceFilesFrom("{ESP8266_SDK}", "libraries/ESP8266WiFi", "src", ".cpp")
 
 	// main library
 	mainlib := denv.SetupCppLibProject(mainpkg, name)
