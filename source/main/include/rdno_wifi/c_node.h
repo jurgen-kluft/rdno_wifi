@@ -11,7 +11,7 @@ namespace ncore
 {
     namespace nnode
     {
-        void connected(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state);
+        void initialize(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state);
 
     }  // namespace nnode
 }  // namespace ncore

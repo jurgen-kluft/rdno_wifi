@@ -1,17 +1,20 @@
-#ifdef TARGET_ESP32
+#ifdef TARGET_ARDUINO
 
 #    include "Arduino.h"
 #    include "WiFi.h"
 
+#    ifdef TARGET_ESP8266
+#        include "ESP8266WiFi.h"
+#    endif
+
 #    include "rdno_wifi/c_wifi.h"
-#    include "rdno_core/c_nvstore.h"
+#    include "rdno_core/c_config.h"
+#    include "rdno_core/c_str.h"
 
 namespace ncore
 {
     namespace nwifi
     {
-        IPAddress_t gLocalIP;
-
         static inline nstatus::status_t sArduinoStatusToNstatus(s32 status)
         {
             switch (status)
@@ -32,13 +35,8 @@ namespace ncore
         bool set_mode_STA() { return WiFi.mode(WIFI_STA); }
         bool set_mode_AP_STA() { return WiFi.mode(WIFI_AP_STA); }
 
-        bool set_host_name(const char* hostname) { return WiFi.setHostname(hostname); }
-
-        bool config_IP_AddrNone() { return WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE); }
-
         nstatus::status_t begin(const char* ssid)
         {
-            // TODO Compile time verification of nstatus::status_t matching the values from the WiFi library ?
             wl_status_t status = WiFi.begin(ssid);
             return sArduinoStatusToNstatus(status);
         }
@@ -51,24 +49,12 @@ namespace ncore
 
         nstatus::status_t begin_encrypted(const char* ssid, const char* passphrase)
         {
-            // TODO Compile time verification of nstatus::status_t matching the values from the WiFi library ?
             wl_status_t status = WiFi.begin(ssid, passphrase);
             return sArduinoStatusToNstatus(status);
         }
 
         void disconnect() { WiFi.disconnect(); }
         void disconnect_AP(bool wifioff) { WiFi.softAPdisconnect(wifioff); }
-
-        s32 host_by_name(const char* hostname, IPAddress_t& outAddr)
-        {
-            IPAddress addr;
-            s32       result     = WiFi.hostByName(hostname, addr);
-            outAddr.m_address[0] = addr[0];
-            outAddr.m_address[1] = addr[1];
-            outAddr.m_address[2] = addr[2];
-            outAddr.m_address[3] = addr[3];
-            return result;
-        }
 
         IPAddress_t local_IP()
         {
@@ -89,7 +75,7 @@ namespace ncore
         }
 
         s32  get_RSSI() { return WiFi.RSSI(); }
-        s32  scan_networks() { return WiFi.scanNetworks(); }
+
         void set_DNS(const IPAddress_t& dns)
         {
             IPAddress ip(dns.m_address[0], dns.m_address[1], dns.m_address[2], dns.m_address[3]);
@@ -124,6 +110,78 @@ namespace ncore
 
         bool reconnect() { return WiFi.reconnect(); }
 
+        // ----------------------------------------------------------------------------------------
+        // ----------------------------------------------------------------------------------------
+        // from: https://github.com/softplus/esp8266-wifi-timing
+
+        // do a fast-connect, if we can, return true if ok
+        bool fast_connect_fast_connect(const char* ssid, const char* auth, nconfig::wifi_t* config)
+        {
+            if (config->ip_address == 0 && config->wifi_channel == 0)
+                return false;
+
+            WiFi.persistent(true);
+            WiFi.mode(WIFI_STA);
+            WiFi.config(config->ip_address, config->ip_gateway, config->ip_mask);
+
+            WiFi.begin(ssid, auth, config->wifi_channel, config->wifi_bssid, true);
+
+            const u32 timeout = millis() + 5000;  // max 5s
+            while ((WiFi.status() != WL_CONNECTED) && (millis() < timeout))
+            {
+                delay(5);
+            }
+
+            return (WiFi.status() == WL_CONNECTED);
+        }
+
+        // do a normal wifi connection, once connected cache connection info, return true if ok
+        bool fast_connect_normal_connect(const char* ssid, const char* auth)
+        {
+            WiFi.persistent(true);
+            WiFi.mode(WIFI_STA);
+
+            WiFi.begin(ssid, auth, 0, NULL, true);
+
+            const u32 timeout = millis() + 15000;  // max 15s
+            while ((WiFi.status() != WL_CONNECTED) && (millis() < timeout))
+            {
+                delay(5);
+            }
+
+            if (WiFi.status() == WL_CONNECTED)
+                return true;
+            return false;
+        }
+
+        // Connect to wifi as specified, returns true if ok
+        bool fast_connect(nconfig::config_t* config)
+        {
+            WiFi.setAutoReconnect(false);  // prevent early autoconnect
+
+            str_t wifi_ssid;
+            nconfig::get_string(config, nconfig::PARAM_ID_WIFI_SSID, wifi_ssid);
+
+            str_t wifi_auth;
+            nconfig::get_string(config, nconfig::PARAM_ID_WIFI_PASSWORD, wifi_auth);
+
+            if (!fast_connect_fast_connect(wifi_ssid.m_const, wifi_auth.m_const, &config->m_wifi))
+            {
+                if (!fast_connect_normal_connect(wifi_ssid.m_const, wifi_auth.m_const))
+                    return false;
+            }
+
+            nconfig::wifi_t& w = config->m_wifi;
+            w.ip_address       = WiFi.localIP();
+            w.ip_gateway       = WiFi.gatewayIP();
+            w.ip_mask          = WiFi.subnetMask();
+            w.ip_dns1          = WiFi.dnsIP(0);
+            w.ip_dns2          = WiFi.dnsIP(1);
+            memcpy(w.wifi_bssid, WiFi.BSSID(), 6);
+            w.wifi_channel = WiFi.channel();
+            return true;
+        }
+
     }  // namespace nwifi
 }  // namespace ncore
 
@@ -135,13 +193,12 @@ namespace ncore
 {
     namespace nwifi
     {
-        // WiFi simulation
+        // WiFi mock
 
         const s32 MaxSocketNum = 4096;
 
         BSID_t              CurrentBSSID              = {0, 0, 0, 0, 0, 0, 0, 0};
         IPAddress_t         CurrentDNS                = {0, 0, 0, 0};
-        nencryption::type_t EncryptionType            = nencryption::None;
         IPAddress_t         CurrentGateway            = {127, 0, 0, 255};
         IPAddress_t         CurrentLocalIP            = {127, 0, 0, 1};
         s32                 CurrentNetworks           = 0;
@@ -154,8 +211,6 @@ namespace ncore
         bool set_mode_AP() { return true; }
         bool set_mode_STA() { return true; }
         bool set_mode_AP_STA() { return true; }
-        bool set_host_name(const char* hostname) { return true; }
-        bool config_IP_AddrNone() { return true; }
 
         nstatus::status_t begin(const char* ssid)
         {
@@ -174,11 +229,9 @@ namespace ncore
         }
 
         void              disconnect() { CurrentStatus = nstatus::Idle; }
-        int               hostbyname(const char* hostname, const char* addr) { return 0; }
         IPAddress_t       local_IP() { return CurrentLocalIP; }
         MACAddress_t      mac_address() { return MACAddress_t{0, 0, 0, 0, 0, 0}; }
         int               get_RSSI() { return CurrentRSSI; }
-        int               scan_networks() { return CurrentNetworks; }
         void              set_DNS(const IPAddress_t& dns) { CurrentDNS = dns; }
         nstatus::status_t status() { return CurrentStatus; }
         const char*       status_str(nstatus::status_t status) { return "Simulated"; }

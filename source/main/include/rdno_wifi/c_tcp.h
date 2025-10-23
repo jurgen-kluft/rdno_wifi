@@ -1,28 +1,32 @@
-#ifndef __RDNO_CORE_WIFI_CLIENT_H__
-#define __RDNO_CORE_WIFI_CLIENT_H__
+#ifndef __RDNO_CORE_WIFI_TCP_H__
+#define __RDNO_CORE_WIFI_TCP_H__
 #include "rdno_core/c_target.h"
 #ifdef USE_PRAGMA_ONCE
 #    pragma once
 #endif
 
-#include "rdno_wifi/c_wifi.h"
+#include "rdno_core/c_network.h"
+#include "rdno_wifi/c_definitions.h"
 
 namespace ncore
 {
-    struct str_t;
+    struct state_tcp_t;
 
     namespace ntcp
     {
-        typedef void* client_t;
-
-        void     server_start(u16 port);
-        client_t server_handle_client();
-        void     server_stop();
-
-        bool     client_is_connected(client_t client);
-        bool     client_recv_msg(client_t client, str_t& msg);
-
+        // Connecting to a TCP server
+        // @see: https://docs.arduino.cc/libraries/wifi/#Client%20class
+        client_t          connect(state_tcp_t* state, IPAddress_t ip, u16 port, s32 timeout_ms);
+        bool              disconnect(state_tcp_t* state, client_t& client);
+        s32               write(state_tcp_t* state, client_t client, const u8* buf, s32 size);
+        nstatus::status_t connected(state_tcp_t* state, client_t client);
+        s32               available(state_tcp_t* state, client_t client);
+        IPAddress_t       remote_IP(state_tcp_t* state, client_t client);
+        u16               remote_port(state_tcp_t* state, client_t client);
+        IPAddress_t       local_IP(state_tcp_t* state, client_t client);
+        u16               local_port(state_tcp_t* state, client_t client);
     }  // namespace ntcp
+
 }  // namespace ncore
 
-#endif  // __RDNO_CORE_WIFI_CLIENT_H__
+#endif  // __RDNO_CORE_WIFI_TCP_H__
