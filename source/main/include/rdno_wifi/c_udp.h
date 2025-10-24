@@ -11,31 +11,11 @@ namespace ncore
 {
     namespace nudp
     {
-        struct sock_t
-        {
-            sock_t()
-                : m_fd(-1)
-                , m_port(0)
-            {
-            }
-            s32 m_fd;
-            u16 m_port;
-        };
-
         bool open(sock_t& instance, u16 port);
         void close(sock_t& instance);
         s32  receive(sock_t& instance, byte* data, s32 max_data_size, IPAddress_t &remote_ip, u16 &remote_port);
-        s32  send_to(sock_t& instance, byte const* data, s32 data_size, const IPAddress_t& to_address, u16 to_port);
+        s32  send_to(sock_t &sock, byte const* data, s32 data_size, const IPAddress_t& to_address, u16 to_port);
     }  // namespace nudp
-
-    struct state_udp_t
-    {
-        nudp::sock_t m_instance;
-        state_udp_t()
-            : m_instance{}
-        {
-        }
-    };
 
 }  // namespace ncore
 

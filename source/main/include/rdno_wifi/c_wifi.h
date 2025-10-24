@@ -5,6 +5,7 @@
 #    pragma once
 #endif
 
+#include "rdno_core/c_state.h"
 #include "rdno_core/c_network.h"
 #include "rdno_wifi/c_definitions.h"
 
@@ -13,6 +14,8 @@ namespace ncore
     namespace nwifi
     {
         // @see: https://www.arduino.cc/en/Reference/WiFi
+
+        void set_state(state_t* state);
 
         // SetModexxx sets the WiFi mode to station (client), access point, or both.
         bool set_mode_AP();      // Set the WiFi mode to access point mode

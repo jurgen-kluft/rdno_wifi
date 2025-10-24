@@ -19,9 +19,21 @@ namespace ncore
         typedef void* client_t;
     }
 
+    namespace nudp
+    {
+        struct udp_sock_t;
+        typedef udp_sock_t* sock_t;
+    }  // namespace nudp
+
     struct state_wifi_t
     {
+    };
+
+    struct state_node_t
+    {
+        u8             remote_mode;
         ntcp::client_t tcp_client;
+        nudp::sock_t   udp_socket;
     };
 
     namespace nstatus

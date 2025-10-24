@@ -5,13 +5,14 @@
 #    pragma once
 #endif
 
-#include "rdno_core/c_task.h"
-
 namespace ncore
 {
+    struct state_t;
+    struct state_task_t;
+
     namespace nnode
     {
-        void initialize(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state);
+        void initialize(state_t* state, state_task_t* task_state);
 
     }  // namespace nnode
 }  // namespace ncore

@@ -15,6 +15,12 @@ namespace ncore
 {
     namespace nwifi
     {
+        state_wifi_t gWiFiState;
+        void set_state(state_t* state)
+        {
+            state->wifi = &gWiFiState;
+        }
+
         static inline nstatus::status_t sArduinoStatusToNstatus(s32 status)
         {
             switch (status)

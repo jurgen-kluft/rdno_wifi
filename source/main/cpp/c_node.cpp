@@ -9,6 +9,7 @@
 #    include "rdno_core/c_network.h"
 #    include "rdno_core/c_nvstore.h"
 #    include "rdno_core/c_serial.h"
+#    include "rdno_core/c_state.h"
 #    include "rdno_core/c_str.h"
 #    include "rdno_core/c_task.h"
 #    include "rdno_core/c_timer.h"
@@ -28,47 +29,46 @@ namespace ncore
         // ----------------------------------------------------------------
         // ----------------------------------------------------------------
 
-        ntask::result_t func_configure_start(ntask::state_t* state)
+        ntask::result_t func_configure_start(state_t* state)
         {
             nwifi::set_mode_AP();
 
             // Start the access point to receive configuration
             char  ap_ssid_bytes[40];
             str_t ap_ssid = str_mutable(ap_ssid_bytes, sizeof(ap_ssid_bytes));
-            str_append(ap_ssid, str_const("esp-"));
+            str_append(ap_ssid, "esp-");
             MACAddress_t mac = nwifi::mac_address();
-            to_str(ap_ssid, mac);
-
+            str_append(ap_ssid, mac);
             str_t ap_password = str_const("1234");
 
             nwifi::begin_AP(ap_ssid.m_const, ap_password.m_const);
             nserial::printf("AP started on %s to receive configuration\n", va_t(ap_ssid.m_const));
 
             // Start the UDP socket to receive configuration data
-            nudp::open(state->udp->m_instance, 4242);
+            nudp::open(state->node->udp_socket, 42420);
 
             return ntask::RESULT_DONE;
         }
 
         char            gUdpMsgBytes[1500];
-        ntask::result_t func_configure_loop(ntask::state_t* state)
+        ntask::result_t func_configure_loop(state_t* state)
         {
             IPAddress_t from_address;
-            u16         from_port  = 0;
-            const s32   udpMsgSize = nudp::receive(state->udp->m_instance, (byte*)gUdpMsgBytes, sizeof(gUdpMsgBytes), from_address, from_port);
+            u16         from_port = 0;
+
+            const s32 udpMsgSize = nudp::receive(state->node->udp_socket, (byte*)gUdpMsgBytes, sizeof(gUdpMsgBytes), from_address, from_port);
             if (udpMsgSize > 0)
             {
                 str_t msg = str_const_n(gUdpMsgBytes, udpMsgSize);
                 if (str_len(msg) > 0)
                 {
 #    ifdef TARGET_DEBUG
-                    nserial::println("Access Point, received message from connected client");
+                    nserial::println("Access Point, received configuration");
 #    endif
                     str_t outKey;
                     str_t outValue;
                     while (nconfig::parse_keyvalue(msg, outKey, outValue))
                     {
-                        // const s16 index = nameToIndex(outKey);
                         const s16 index = napp::config_key_to_index(outKey);
 #    ifdef TARGET_DEBUG
                         nserial::printf("Parse %s = %s, index = %d\n", va_t(outKey.m_const + outKey.m_str), va_t(outValue.m_const + outValue.m_str), va_t(index));
@@ -107,14 +107,14 @@ namespace ncore
                     {
                         nwifi::disconnect_AP(false);  // Stop the access point
 
-                        nserial::println("Access point, new configuration approved.");
+                        nserial::println("Access point, new configuration");
                         nvstore::save(state->config);  // Save the configuration to non-volatile storage
 
                         return ntask::RESULT_DONE;
                     }
                     else
                     {
-                        nserial::println("Access point, invalid configuration received, waiting for new configuration.");
+                        nserial::println("Access point, configuration invalid!");
                     }
                 }
             }
@@ -122,7 +122,7 @@ namespace ncore
         }
 
         // We have a UDP socket that can receive configuration updates while connected
-        ntask::result_t func_check_config_update(ntask::state_t* state)
+        ntask::result_t func_check_config_update(state_t* state)
         {
             if (func_configure_loop(state) == ntask::RESULT_DONE)
             {
@@ -134,10 +134,8 @@ namespace ncore
             return ntask::RESULT_OK;
         }
 
-        ntask::result_t func_connect_to_WiFi_start(ntask::state_t* state)
+        ntask::result_t func_connect_to_WiFi_start(state_t* state)
         {
-            // TODO, can we check the state of the WiFi system, perhaps it is still in STATION mode and connected?
-
             nwifi::set_mode_STA();  // Set WiFi to station mode
 
             str_t ssid;
@@ -148,31 +146,27 @@ namespace ncore
                 return ntask::RESULT_ERROR;
 
             nserial::printf("Connecting to WiFi with SSID %s ...\n", va_t(ssid.m_const));
-
             nwifi::begin_encrypted(ssid.m_const, pass.m_const);  // Connect to WiFi
 
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_wifi_is_connected(ntask::state_t* state)
+        ntask::result_t func_wifi_is_connected(state_t* state)
         {
             if (nwifi::status() == nstatus::Connected)
-            {
                 return ntask::RESULT_DONE;
-            }
-
             return ntask::RESULT_OK;
         }
 
-        ntask::result_t func_wifi_disconnect(ntask::state_t* state)
+        ntask::result_t func_wifi_disconnect(state_t* state)
         {
             nwifi::disconnect();
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_connect_to_remote_start(ntask::state_t* state)
+        ntask::result_t func_connect_to_remote_start(state_t* state)
         {
-            ntcp::disconnect(state->tcp, state->wifi->tcp_client);  // Stop any existing client connection
+            ntcp::disconnect(state->tcp, state->node->tcp_client);  // Stop any existing client connection
 
             if (nwifi::status() != nstatus::Connected)
             {
@@ -184,7 +178,7 @@ namespace ncore
             return ntask::RESULT_DONE;
         }
 
-        ntask::result_t func_remote_connecting(ntask::state_t* state)
+        ntask::result_t func_remote_connecting(state_t* state)
         {
             nconfig::config_t* config = state->config;
 
@@ -205,154 +199,170 @@ namespace ncore
             remote_server_ip_address.from(remote_server);
 
 #    ifdef TARGET_DEBUG
-            nserial::printf("Connecting to %x:%d (IP: %d.%d.%d.%d) ...\n", va_t(remote_server), va_t(remote_port), va_t(remote_server_ip_address.m_address[0]), va_t(remote_server_ip_address.m_address[1]), va_t(remote_server_ip_address.m_address[2]),
-                            va_t(remote_server_ip_address.m_address[3]));
+            nserial::printf("Connecting to %x:%d (IP: %d.%d.%d.%d, MODE: %d) ...\n", va_t(remote_server), va_t(remote_port), va_t(remote_server_ip_address.m_address[0]), va_t(remote_server_ip_address.m_address[1]),
+                            va_t(remote_server_ip_address.m_address[2]), va_t(state->node->remote_mode), va_t(remote_server_ip_address.m_address[3]));
 #    endif
-
-            state->wifi->tcp_client = ntcp::connect(state->tcp, remote_server_ip_address, remote_port, 8000);
-            if (ntcp::connected(state->tcp, state->wifi->tcp_client) == nstatus::Connected)
+            if (state->node->remote_mode == 0)
             {
+                state->node->tcp_client = ntcp::connect(state->tcp, remote_server_ip_address, remote_port, 8000);
+                if (ntcp::connected(state->tcp, state->node->tcp_client) == nstatus::Connected)
+                {
 #    ifdef TARGET_DEBUG
-                nserial::println("  -> Connected to remote.");
+                    nserial::println("  -> Connected to remote.");
 
-                IPAddress_t localIP = ntcp::local_IP(state->tcp, state->wifi->tcp_client);
-                nserial::print("     IP: ");
-                nserial::print(localIP);
-                nserial::println("");
+                    IPAddress_t localIP = ntcp::local_IP(state->tcp, state->node->tcp_client);
+                    nserial::print("     IP: ");
+                    nserial::print(localIP);
+                    nserial::println("");
 
-                MACAddress_t mac = nwifi::mac_address();
-                nserial::print("     MAC: ");
-                nserial::print(mac);
-                nserial::println("");
+                    MACAddress_t mac = nwifi::mac_address();
+                    nserial::print("     MAC: ");
+                    nserial::print(mac);
+                    nserial::println("");
 #    endif
-                state->time_ms = ntimer::millis();
-                // state->time_sync = ntimer::millis();
+                    state->time_ms = ntimer::millis();
+                    // state->time_sync = ntimer::millis();
 
-                return ntask::RESULT_DONE;
+                    return ntask::RESULT_DONE;
+                }
             }
-
-            return ntask::RESULT_OK;
-        }
-
-        ntask::result_t func_remote_is_connected(ntask::state_t* state)
-        {
-            if (ntcp::connected(state->tcp, state->wifi->tcp_client) == nstatus::Connected)
+            else if (state->node->remote_mode == 1)
             {
                 return ntask::RESULT_DONE;
             }
-
             return ntask::RESULT_OK;
         }
 
-        void initialize(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state)
+        ntask::result_t func_remote_is_connected(state_t* state)
         {
-            ntask::program_t node_configure_program  = ntask::program(scheduler, "configuration program");
-            ntask::program_t node_connected_program  = ntask::program(scheduler, "connected program");
-            ntask::program_t node_connecting_program = ntask::program(scheduler, "connecting program");
-
-            // Boot by jumping to the connecting program if we have valid configuration, otherwise
-            // jump to the configuration program to setup WiFi and Remote configuration.
-            ntask::timeout_t config_timeout(1 * 60 * 1000);
-            if (state->has_config())
+            if (state->node->remote_mode == 1)
             {
-                ntask::boot(scheduler, node_connecting_program);
+                return ntask::RESULT_DONE;
             }
             else
             {
-                ntask::boot(scheduler, node_configure_program);
-                config_timeout.m_timeout_ms = 0;  // No timeout if we don't have configuration
+                if (ntcp::connected(state->tcp, state->node->tcp_client) == nstatus::Connected)
+                {
+                    return ntask::RESULT_DONE;
+                }
             }
-
-            // The configuration program will start an access point and UDP to receive configuration data.
-            // When valid configuration is received it will jump to the connecting program, otherwise it will
-            // keep waiting for valid configuration.
-            // Once the connecting program is started it will try to connect to WiFi and the Remote, when both
-            // are connected it will jump to the connected program.
-            // The connected program will check if we are still connected to both WiFi and Remote, and will
-            // call the main program. If either WiFi or Remote are disconnected it will jump to the connecting
-            // program to reconnect.
-
-            // TODO Do we need a timeout on this program, that no matter what we jump to the connecting program
-            //      to try to connect to WiFi and Remote?
-            ntask::op_begin(scheduler, node_configure_program);
-            {
-                ntask::op_once(scheduler, func_configure_start);
-                ntask::op_if(scheduler, func_configure_loop);
-                {
-                    ntask::op_jump(scheduler, node_connecting_program);
-                }
-                ntask::op_end(scheduler);
-
-                // If we time out while waiting for configuration, we jump to the connecting program
-                // Note: Currently set to 5 minutes
-                ntask::op_if(scheduler, config_timeout);
-                {
-                    ntask::op_jump(scheduler, node_connecting_program);
-                }
-                ntask::op_end(scheduler);
-            }
-            ntask::op_end(scheduler);
-
-            // When the program is fully connected, we run this program that
-            // checks if we are still connected both to WiFi and the Remote.
-            // If not we jump to the connecting program to reconnect.
-            // If both are connected we also call the main program.
-            ntask::op_begin(scheduler, node_connected_program);
-            {
-                ntask::op_if(scheduler, func_wifi_is_connected);
-                {
-                    ntask::op_if(scheduler, func_remote_is_connected);
-                    {
-                        ntask::op_run(scheduler, main);
-                        ntask::op_return(scheduler);
-                    }
-                    ntask::op_end(scheduler);
-
-                    ntask::op_jump(scheduler, node_connecting_program);
-                }
-                ntask::op_end(scheduler);
-
-                ntask::op_jump(scheduler, node_connecting_program);
-            }
-            ntask::op_end(scheduler);
-
-            // The connecting program will first try to connect to WiFi, when connected
-            // it will try to connect to the Remote. If both are connected we jump to
-            // the connected program. If we time out trying to connect to either WiFi or Remote
-            // we jump to the configure program to start over.
-            ntask::op_begin(scheduler, node_connecting_program);
-            {
-                ntask::op_once(scheduler, func_connect_to_WiFi_start);
-                ntask::op_if(scheduler, func_wifi_is_connected);
-                {
-                    ntask::op_once(scheduler, func_connect_to_remote_start);
-
-                    ntask::op_if(scheduler, func_remote_connecting);
-                    {
-                        ntask::op_jump(scheduler, node_connected_program);
-                    }
-                    ntask::op_end(scheduler);
-
-                    ntask::op_if(scheduler, ntask::timeout_t(300 * 1000));
-                    {
-                        ntask::op_once(scheduler, func_wifi_disconnect);
-                        ntask::op_jump(scheduler, node_configure_program);
-                    }
-                    ntask::op_end(scheduler);
-
-                    ntask::op_return(scheduler);
-                }
-                ntask::op_end(scheduler);
-
-                ntask::op_if(scheduler, ntask::timeout_t(300 * 1000));
-                {
-                    ntask::op_once(scheduler, func_wifi_disconnect);
-                    ntask::op_jump(scheduler, node_configure_program);
-                }
-                ntask::op_end(scheduler);
-            }
-            ntask::op_end(scheduler);
+            return ntask::RESULT_OK;
         }
+
+        void node_connecting_wifi(ntask::scheduler_t* scheduler, state_t* state);
+        ntask::program_t program_node_connecting_wifi(node_connecting_wifi);
+
+        void node_connected_tcp_program(ntask::scheduler_t* scheduler, state_t* state)
+        {
+            if (ntask::call(scheduler, func_wifi_is_connected))
+            {
+                if (ntask::call(scheduler, func_remote_is_connected))
+                {
+                    ntask::call(scheduler, func_check_config_update);
+                    ntask::call_program(scheduler->m_state_task->m_main_program);
+                    return;
+                }
+            }
+            ntask::jmp_program(scheduler, &program_node_connecting_wifi);
+        }
+        ntask::program_t program_node_connected_tcp(node_connected_tcp_program);
+
+        void node_connected_udp_program(ntask::scheduler_t* scheduler, state_t* state)
+        {
+            if (ntask::call(scheduler, func_wifi_is_connected))
+            {
+                ntask::call(scheduler, func_check_config_update);
+                ntask::call_program(scheduler->m_state_task->m_main_program);
+                return;
+            }
+            ntask::jmp_program(scheduler, &program_node_connecting_wifi);
+        }
+        ntask::program_t program_node_connected_udp(node_connected_udp_program);
+
+        ntask::timeout_t gConfigureTimeout(5 * 60 * 1000);
+        void node_configure_program(ntask::scheduler_t* scheduler, state_t* state)
+        {
+            // // If we time out while waiting for configuration, we jump to the connecting program
+            // // Note: Currently set to 5 minutes
+            if (ntask::is_first_call(scheduler))
+            {
+                ntask::init_timeout(scheduler, gConfigureTimeout);
+                ntask::call(scheduler, func_configure_start);
+            }
+
+            if (ntask::call(scheduler, func_configure_loop))
+            {
+                ntask::jmp_program(scheduler, &program_node_connecting_wifi);
+            }
+            else if (ntask::timeout(scheduler, gConfigureTimeout))
+            {
+                ntask::jmp_program(scheduler, &program_node_connecting_wifi);
+            }
+        }
+        ntask::program_t program_node_configure(node_configure_program);
+
+        ntask::timeout_t gRemoteConnectTimeout(300 * 1000);
+        void node_connecting_remote(ntask::scheduler_t* scheduler, state_t* state)
+        {
+            if (ntask::is_first_call(scheduler))
+            {
+                ntask::init_timeout(scheduler, gRemoteConnectTimeout);
+                ntask::call(scheduler, func_connect_to_remote_start);
+            }
+
+            if (ntask::call(scheduler, func_remote_is_connected))
+            {
+                ntask::jmp_program(scheduler, &program_node_connected_tcp);
+            }
+            else if (ntask::timeout(scheduler, gRemoteConnectTimeout))
+            {
+                ntask::call(scheduler, func_wifi_disconnect);
+                ntask::jmp_program(scheduler, &program_node_configure);
+            }
+        }
+        ntask::program_t program_node_connecting_remote(node_connecting_remote);
+
+        ntask::timeout_t gWiFiConnectTimeout(300 * 1000);
+        void node_connecting_wifi(ntask::scheduler_t* scheduler, state_t* state)
+        {
+            if (ntask::is_first_call(scheduler))
+            {
+                ntask::init_timeout(scheduler, gWiFiConnectTimeout);
+                ntask::call(scheduler, func_connect_to_WiFi_start);
+            }
+
+            if (ntask::call(scheduler, func_wifi_is_connected))
+            {
+                ntask::jmp_program(scheduler, &program_node_connecting_remote);
+            }
+            else if (ntask::timeout(scheduler, gWiFiConnectTimeout))
+            {
+                ntask::call(scheduler, func_wifi_disconnect);
+                ntask::jmp_program(scheduler, &program_node_configure);
+            }
+        }
+
+        state_node_t gNodeState;
+        void         initialize(state_t* state, state_task_t* task_state)
+        {
+            nwifi::set_state(state);
+
+            gNodeState.remote_mode = 1;  // Default to UDP
+            nconfig::get_uint8(state->config, nconfig::PARAM_ID_REMOTE_MODE, gNodeState.remote_mode);
+            gNodeState.tcp_client = nullptr;
+            gNodeState.udp_socket = nullptr;
+            state->node           = &gNodeState;
+
+            if (state->has_config())
+            {
+                ntask::set_start(state, task_state, &program_node_connecting_wifi);
+            }
+            else
+            {
+                ntask::set_start(state, task_state, &program_node_configure);
+            }
+        }
+
 
     }  // namespace nnode
 }  // namespace ncore
@@ -365,7 +375,7 @@ namespace ncore
 {
     namespace nnode
     {
-        void connected(ntask::executor_t* scheduler, ntask::program_t main, ntask::state_t* state) { boot(scheduler, main); }
+        void connected(ntask::scheduler_t* scheduler, ntask::program_t main, state_t* state) { boot(scheduler, main); }
 
     }  // namespace nnode
 }  // namespace ncore
