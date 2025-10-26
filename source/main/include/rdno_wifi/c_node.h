@@ -13,6 +13,7 @@ namespace ncore
     namespace nnode
     {
         void initialize(state_t* state, state_task_t* task_state);
+        void send_sensor_data(state_t* state, const byte* data, const s32 size);
 
     }  // namespace nnode
 }  // namespace ncore

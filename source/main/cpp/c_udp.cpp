@@ -1,4 +1,5 @@
 #include "rdno_core/c_str.h"
+#include "rdno_core/c_state.h"
 #include "rdno_wifi/c_udp.h"
 
 #ifdef TARGET_ARDUINO
@@ -19,39 +20,70 @@
 
 namespace ncore
 {
+#    ifdef TARGET_ESP32
+    namespace nudp
+    {
+        struct udp_sock_t
+        {
+            int m_fd;
+            u16 m_port;
+        };
+    }  // namespace nudp
+    struct state_udp_t
+    {
+        nudp::udp_sock_t sock;
+    };
+#    endif
+
+#    ifdef TARGET_ESP8266
+    namespace nudp
+    {
+        struct udp_sock_t
+        {
+            WiFiUDP m_udp;
+            u16     m_port;
+        };
+    }  // namespace nudp
+    struct state_udp_t
+    {
+        nudp::udp_sock_t sock;
+    };
+#    endif
+
     namespace nudp
     {
 #    ifdef TARGET_ESP32
-        struct udp_sock_t
+        state_udp_t gUdpState;
+
+        void init_state(state_t *state)
         {
-            int  m_fd   = -1;
-            u16  m_port = 0;
-        };
+            gUdpState.sock.m_fd   = -1;
+            gUdpState.sock.m_port = 0xFFFF;
+            state->udp            = &gUdpState;
+        }
 
         bool open(sock_t &sock, u16 port)
         {
             if (sock == nullptr)
             {
-                sock = (udp_sock_t*)malloc(sizeof(udp_sock_t));
-                memset(sock, 0, sizeof(udp_sock_t));
+                sock = &gUdpState.sock;
             }
-
-            if (sock->m_port != port)
+            else
             {
+                // If already opened with same port, do nothing
+                if (sock->m_port == port)
+                    return true;
                 close(sock);
             }
 
-            if (sock->m_fd != -1)
-                return true;
-
             IPAddress address(IPv4);
-            sock->m_port = port;
-
             if ((sock->m_fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
             {
                 log_e("could not create socket: %d", errno);
+                sock->m_port = 0xFFFF;
                 return false;
             }
+            sock->m_port = port;
 
             int yes = 1;
             if (setsockopt(sock->m_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
@@ -71,6 +103,7 @@ namespace ncore
                 tmpaddr->sin_addr.s_addr = (in_addr_t)address;
                 sock_size                = sizeof(sockaddr_in);
             }
+
             if (bind(sock->m_fd, (sockaddr *)&serveraddr, sock_size) == -1)
             {
                 log_e("could not bind socket: %d", errno);
@@ -78,16 +111,19 @@ namespace ncore
                 return false;
             }
             fcntl(sock->m_fd, F_SETFL, O_NONBLOCK);
+
             return true;
         }
 
         void close(sock_t &sock)
         {
-            if (sock == nullptr)
-                return;
-            if (sock->m_fd != -1)
+            if (sock != nullptr && sock->m_port != 0xFFFF)
+            {
                 ::close(sock->m_fd);
-            free(sock);
+                sock->m_port = 0xFFFF;
+                sock->m_fd   = -1;
+                sock         = nullptr;
+            }
         }
 
         s32 receive(sock_t &sock, byte *rxdata, s32 max_rxdatasize, IPAddress_t &remote_ip, u16 &remote_port)
@@ -135,85 +171,72 @@ namespace ncore
         s32 send_to(sock_t &sock, byte const *data, s32 data_size, const IPAddress_t &to_address, u16 to_port)
         {
             if (sock == nullptr || sock->m_fd == -1)
-            {
                 return 0;
-            }
 
             byte const *tx_buffer     = data;
             u32 const   tx_buffer_len = data_size;
 
             IPAddress remote_ip(to_address.m_address[0], to_address.m_address[1], to_address.m_address[2], to_address.m_address[3]);
-            ip_addr_t addr;
-            remote_ip.to_ip_addr_t(&addr);
 
-            if (remote_ip.type() == IPv4)
-            {
-                struct sockaddr_in recipient;
-                recipient.sin_addr.s_addr = (uint32_t)remote_ip;
-                recipient.sin_family      = AF_INET;
-                recipient.sin_port        = htons(to_port);
-                int sent                  = sendto(sock->m_fd, tx_buffer, tx_buffer_len, 0, (struct sockaddr *)&recipient, sizeof(recipient));
-                if (sent < 0)
-                {
-                    log_e("could not send data: %d", errno);
-                    return 0;
-                }
-            }
-            return data_size;
+            struct sockaddr_in recipient;
+            recipient.sin_addr.s_addr = (uint32_t)remote_ip;
+            recipient.sin_family      = AF_INET;
+            recipient.sin_port        = htons(to_port);
+            const int sent            = sendto(sock->m_fd, tx_buffer, tx_buffer_len, 0, (struct sockaddr *)&recipient, sizeof(recipient));
+            if (sent > 0)
+                return sent;
+
+            log_e("could not send data: %d", errno);
+            return 0;
         }
 #    endif
 
 #    ifdef TARGET_ESP8266
-        struct udp_sock_t
+        state_udp_t gUdpState;
+
+        void init_state(state_t &state)
         {
-            WiFiUDP m_udp;
-            u16     m_port = 0;
-        };
+            gUdpState.m_port = 0xFFFF;
+            state.udp        = &gUdpState;
+        }
 
         bool open(sock_t &sock, u16 port)
         {
             if (sock == nullptr)
             {
-                void* mem = malloc(sizeof(udp_sock_t));
-                new (mem) udp_sock_t();
-                sock = (udp_sock_t*)mem;
-                sock->m_port = 0xFFFF;
+                sock = &gUdpState.sock;
             }
-
-            if (sock->m_port != port)
+            else
             {
+                // If already opened with same port, do nothing
+                if (sock->m_port == port)
+                    return true;
                 close(sock);
             }
 
-            if (sock->m_port != 0xFFFF)
-                return true;
-
-            IPAddress address();
-            sock->m_port = port;
-
-            if (sock->m_udp.begin(sock->m_port) == 0)
+            if (sock->m_udp.begin(port) == 0)
             {
                 DEBUGV("could not open UDP socket");
-                close(sock);
                 return false;
             }
+            sock->m_port = port;
             return true;
         }
 
         void close(sock_t &sock)
         {
-            if (sock == nullptr)
-                return;
-            sock->m_udp.stop();
-            free(sock);
+            if (sock != nullptr && sock->m_port != 0xFFFF)
+            {
+                sock->m_udp.stop();
+                sock->m_port = 0xFFFF;
+                sock         = nullptr;
+            }
         }
 
         s32 receive(sock_t &sock, byte *rxdata, s32 max_rxdatasize, IPAddress_t &remote_ip, u16 &remote_port)
         {
-            if (sock == nullptr)
-            {
+            if (sock == nullptr || sock->m_port == 0xFFFF)
                 return 0;
-            }
 
             int len = sock->m_udp.parsePacket();
             if (len <= 0)
@@ -228,24 +251,24 @@ namespace ncore
 
             sock->m_udp.read(rxdata, len);
 
-            IPAddress from = sock->m_udp.remoteIP();
+            IPAddress from         = sock->m_udp.remoteIP();
             remote_ip.m_address[0] = from[0];
             remote_ip.m_address[1] = from[1];
             remote_ip.m_address[2] = from[2];
             remote_ip.m_address[3] = from[3];
-            remote_port = sock->m_udp.remotePort();
+            remote_port            = sock->m_udp.remotePort();
 
             return len;
         }
 
         s32 send_to(sock_t &sock, byte const *data, s32 data_size, const IPAddress_t &to_address, u16 to_port)
         {
-            if (sock == nullptr)
-            {
+            if (sock == nullptr || sock->m_port == 0xFFFF)
                 return 0;
-            }
 
-            IPAddress remote_ip(to_address.m_address[0], to_address.m_address[1], to_address.m_address[2], to_address.m_address[3]);
+            ip4_addr_t ip4_addr;
+            IP4_ADDR(&ip4_addr, to_address.m_address[0], to_address.m_address[1], to_address.m_address[2], to_address.m_address[3]);
+            IPAddress remote_ip(ip4_addr);
 
             sock->m_udp.beginPacket(remote_ip, to_port);
             sock->m_udp.write(data, data_size);

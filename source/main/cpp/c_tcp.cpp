@@ -1,4 +1,7 @@
+#include "rdno_core/c_state.h"
 #include "rdno_core/c_str.h"
+#include "rdno_core/c_malloc.h"
+#include "rdno_core/c_memory.h"
 #include "rdno_wifi/c_tcp.h"
 
 #ifdef TARGET_ARDUINO
@@ -18,6 +21,14 @@ namespace ncore
 
     namespace ntcp
     {
+        state_tcp_t gTcpState;
+
+        void init_state(state_t* state)
+        {
+            gTcpState.m_NumClients = 0;
+            state->tcp = &gTcpState;
+        }
+
 #    ifdef TARGET_ESP32
         client_t connect(state_tcp_t* state, IPAddress_t _ip, u16 _port, s32 timeout_ms)
         {
@@ -32,9 +43,8 @@ namespace ncore
 
         bool disconnect(state_tcp_t* state, client_t& client)
         {
-            if (client == nullptr)
+            if (client == nullptr || state->m_NumClients == 0)
                 return false;
-
             state->m_WiFiClient.stop();
             state->m_NumClients--;
             client = nullptr;
@@ -48,13 +58,11 @@ namespace ncore
             return (s32)state->m_WiFiClient.write(buf, size);
         }
 
-        nstatus::status_t connected(state_tcp_t* state, client_t client)
+        bool connected(state_tcp_t* state, client_t client)
         {
-            if (client == nullptr)
-                return nstatus::Disconnected;
-            if (state->m_WiFiClient.connected() == 0)
-                return nstatus::Disconnected;
-            return nstatus::Connected;
+            if (client == nullptr || state->m_WiFiClient.connected() == 0)
+                return false;
+            return true;
         }
 
         s32 available(state_tcp_t* state, client_t client)
@@ -108,7 +116,7 @@ namespace ncore
 
         bool disconnect(state_tcp_t* state, client_t& client)
         {
-            if (client == nullptr)
+            if (client == nullptr || state->m_NumClients == 0)
                 return false;
             state->m_WiFiClient.stop();
             state->m_NumClients--;
@@ -123,13 +131,13 @@ namespace ncore
             return state->m_WiFiClient.write(buf, size);
         }
 
-        nstatus::status_t connected(state_tcp_t* state, client_t client)
+        bool connected(state_tcp_t* state, client_t client)
         {
             if (client == nullptr)
-                return nstatus::Disconnected;
+                return false;
             if (state->m_WiFiClient.connected() == 0)
-                return nstatus::Disconnected;
-            return nstatus::Connected;
+                return false;
+            return true;
         }
 
         s32 available(state_tcp_t* state, client_t client)

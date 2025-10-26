@@ -9,8 +9,13 @@
 
 namespace ncore
 {
+    struct state_t;
+    struct state_udp_t;
+
     namespace nudp
     {
+        void init_state(state_t* state);
+
         bool open(sock_t& instance, u16 port);
         void close(sock_t& instance);
         s32  receive(sock_t& instance, byte* data, s32 max_data_size, IPAddress_t &remote_ip, u16 &remote_port);
