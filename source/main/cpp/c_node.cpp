@@ -24,7 +24,6 @@ namespace ncore
     {
         u8             remote_mode;
         ntcp::client_t tcp_client;
-        nudp::sock_t   udp_socket;
     };
 
     namespace nnode
@@ -77,7 +76,7 @@ namespace ncore
             else
             {
                 nserial::println("Connecting to remote udp server...");
-                nudp::open(state->node->udp_socket, 31337);  // Open UDP socket on port 31337
+                nudp::open(state, 31337);  // Open UDP socket on port 31337
             }
 
             return ntask::RESULT_DONE;
@@ -138,11 +137,7 @@ namespace ncore
 
         // -----------------------------------------------------------------------------------
         // programs
-
-        void node_failure(ntask::scheduler_t* scheduler, state_t* state)
-        {
-            // deepsleep on timer or reset ?
-        }
+        void             node_failure(ntask::scheduler_t* scheduler, state_t* state);
         ntask::program_t program_node_failure(node_failure);
 
         void             node_connecting_wifi(ntask::scheduler_t* scheduler, state_t* state);
@@ -198,6 +193,13 @@ namespace ncore
         }
         ntask::program_t program_node_connecting_remote(node_connecting_remote);
 
+        void node_failure(ntask::scheduler_t* scheduler, state_t* state)
+        {
+            // reset the eeprom data so that next time we try to connect again from scratch
+            state->wifi->m_cache.reset();
+            ntask::jmp_program(scheduler, &program_node_connecting_wifi);
+        }
+
         ntask::timeout_t gWiFiConnectTimeout(300 * 1000);
         void             node_connecting_wifi(ntask::scheduler_t* scheduler, state_t* state)
         {
@@ -220,7 +222,7 @@ namespace ncore
 
         void initialize(state_t* state, state_task_t* task_state)
         {
-            nwifi::init_state(state);
+            nwifi::init_state(state, false);
             ntcp::init_state(state);
             nudp::init_state(state);
 
@@ -228,7 +230,6 @@ namespace ncore
 
             gNodeState.remote_mode = 0;  // 0 = TCP, 1 = UDP
             gNodeState.tcp_client  = nullptr;
-            gNodeState.udp_socket  = nullptr;
 
             ntask::set_start(state, task_state, &program_node_connecting_wifi);
         }
@@ -248,7 +249,7 @@ namespace ncore
                 remote_server_ip.from(state->ServerIP);
                 const u16 remote_port = state->ServerUdpPort;
 
-                nudp::send_to(state->node->udp_socket, data, size, remote_server_ip, remote_port);
+                nudp::send_to(state, data, size, remote_server_ip, remote_port);
             }
         }
 

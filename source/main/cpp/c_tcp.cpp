@@ -34,7 +34,7 @@ namespace ncore
         {
             if (state->m_NumClients == 1)
                 return nullptr;
-            IPAddress ip(_ip.m_address[0], _ip.m_address[1], _ip.m_address[2], _ip.m_address[3]);
+            IPAddress ip(_ip.m_address);
             if (state->m_WiFiClient.connect(ip, _port, timeout_ms) == 0)
                 return nullptr;
             state->m_NumClients++;
@@ -78,10 +78,7 @@ namespace ncore
         {
             IPAddress   ip = state->m_WiFiClient.remoteIP();
             IPAddress_t rip;
-            rip.m_address[0] = ip[0];
-            rip.m_address[1] = ip[1];
-            rip.m_address[2] = ip[2];
-            rip.m_address[3] = ip[3];
+            rip.from(ip[0], ip[1], ip[2], ip[3]);
             return rip;
         }
 
@@ -91,10 +88,7 @@ namespace ncore
         {
             IPAddress   ip = state->m_WiFiClient.localIP();
             IPAddress_t lip;
-            lip.m_address[0] = ip[0];
-            lip.m_address[1] = ip[1];
-            lip.m_address[2] = ip[2];
-            lip.m_address[3] = ip[3];
+            lip.from(ip[0], ip[1], ip[2], ip[3]);
             return lip;
         }
 
@@ -106,7 +100,7 @@ namespace ncore
         {
             if (state->m_NumClients == 1)
                 return nullptr;
-            IPAddress ip(_ip.m_address[0], _ip.m_address[1], _ip.m_address[2], _ip.m_address[3]);
+            IPAddress ip(_ip.m_address);
             state->m_WiFiClient.setTimeout(timeout_ms);
             if (state->m_WiFiClient.connect(ip, _port) == 0)
                 return nullptr;

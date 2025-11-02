@@ -20,35 +20,37 @@ namespace ncore
     {
         state_wifi_t gWiFiState;
 
-        void init_state(state_t* state)
+        void cache_t::reset() { g_memclr(this, sizeof(cache_t)); }
+
+        void init_state(state_t* state, bool load_cache)
         {
-            state->wifi = &gWiFiState;
-            g_memclr(&state->wifi->m_cache, sizeof(nwifi::cache_t));
+            state->wifi           = &gWiFiState;
             state->wifi->m_status = nstatus::Disconnected;
 
-            ncore::nserial::println("loading WiFi cache from EEPROM");
-            ncore::neeprom::load((byte*)&state->wifi->m_cache, sizeof(ncore::nwifi::cache_t));
+            if (load_cache)
             {
-                const u32 crc              = state->wifi->m_cache.m_crc;
-                state->wifi->m_cache.m_crc = 0;
-                if (crc != neeprom::crc32((const byte*)&state->wifi->m_cache, sizeof(nwifi::cache_t)))
+                ncore::nserial::println("loading WiFi cache from EEPROM");
+                ncore::neeprom::load((byte*)&state->wifi->m_cache, sizeof(ncore::nwifi::cache_t));
                 {
-                    ncore::nserial::println(" WiFi cache in EEPROM is corrupted (CRC mismatch)");
-                    g_memclr(&state->wifi->m_cache, sizeof(nwifi::cache_t));
-                } else {
-                    ncore::nserial::println("WiFi cache loaded from EEPROM");
+                    const u32 crc              = state->wifi->m_cache.m_crc;
+                    state->wifi->m_cache.m_crc = 0;
+                    if (crc != neeprom::crc32((const byte*)&state->wifi->m_cache, sizeof(nwifi::cache_t)))
+                    {
+                        ncore::nserial::println(" WiFi cache in EEPROM is corrupted (CRC mismatch)");
+                        state->wifi->m_cache.reset();
+                    }
+                    else
+                    {
+                        ncore::nserial::println("WiFi cache loaded from EEPROM");
+                        state->wifi->m_cache.m_crc = crc;
+                    }
                 }
-                state->wifi->m_cache.m_crc = crc;
+            }
+            else
+            {
+                state->wifi->m_cache.reset();
             }
         }
-
-        bool set_mode_AP() { return WiFi.mode(WIFI_AP); }
-        bool set_mode_STA() { return WiFi.mode(WIFI_STA); }
-        bool set_mode_AP_STA() { return WiFi.mode(WIFI_AP_STA); }
-
-        bool begin_AP(const char* ap_ssid, const char* ap_password) { return WiFi.softAP(ap_ssid, ap_password); }
-
-        wl_status_t begin_encrypted(const char* ssid, const char* passphrase) { return WiFi.begin(ssid, passphrase); }
 
         void disconnect() { WiFi.disconnect(); }
         void disconnect_AP(bool wifioff) { WiFi.softAPdisconnect(wifioff); }
@@ -57,10 +59,7 @@ namespace ncore
         {
             IPAddress   ip = WiFi.localIP();
             IPAddress_t ipAddr;
-            ipAddr.m_address[0] = ip[0];
-            ipAddr.m_address[1] = ip[1];
-            ipAddr.m_address[2] = ip[2];
-            ipAddr.m_address[3] = ip[3];
+            ipAddr.from(ip[0], ip[1], ip[2], ip[3]);
             return ipAddr;
         }
 
@@ -71,11 +70,11 @@ namespace ncore
             return macAddress;
         }
 
-        s32 get_RSSI() { return WiFi.RSSI(); }
+        s32 get_RSSI(state_t* state) { return WiFi.RSSI(); }
 
         void set_DNS(const IPAddress_t& dns)
         {
-            IPAddress ip(dns.m_address[0], dns.m_address[1], dns.m_address[2], dns.m_address[3]);
+            IPAddress ip(dns.m_address);
             WiFi.setDNS(ip);
         }
 
@@ -89,31 +88,27 @@ namespace ncore
         // do a fast-connect, if we can, return true if ok
         void fast_connect_fast(const char* ssid, const char* auth, nwifi::cache_t const& cache)
         {
-            WiFi.persistent(true);
-            WiFi.mode(WIFI_STA);
             WiFi.config(cache.ip_address, cache.ip_gateway, cache.ip_mask);
             WiFi.begin(ssid, auth, cache.wifi_channel, cache.wifi_bssid, true);
         }
 
         // do a normal wifi connection, once connected cache connection info, return true if ok
-        void fast_connect_normal(const char* ssid, const char* auth)
-        {
-            WiFi.persistent(true);
-            WiFi.mode(WIFI_STA);
-            WiFi.begin(ssid, auth, 0, NULL, true);
-        }
+        void fast_connect_normal(const char* ssid, const char* auth) { WiFi.begin(ssid, auth, 0, NULL, true); }
 
         // Connect to wifi as specified, returns true if ok
         void connect(state_t* state)
         {
             WiFi.setAutoReconnect(false);  // prevent early autoconnect
-
-            if (state->wifi->m_cache.ip_address == 0 && state->wifi->m_cache.wifi_channel == 0)
+            if (state->wifi->m_cache.ip_address == 0)
             {
+                WiFi.persistent(false);
+                WiFi.mode(WIFI_STA);
                 fast_connect_normal(state->WiFiSSID, state->WiFiPassword);
             }
             else
             {
+                WiFi.persistent(true);
+                WiFi.mode(WIFI_STA);
                 fast_connect_fast(state->WiFiSSID, state->WiFiPassword, state->wifi->m_cache);
             }
         }
@@ -134,7 +129,7 @@ namespace ncore
                     cache.ip_mask         = WiFi.subnetMask();
                     cache.ip_dns1         = WiFi.dnsIP(0);
                     cache.ip_dns2         = WiFi.dnsIP(1);
-                    memcpy(cache.wifi_bssid, WiFi.BSSID(), 6);
+                    WiFi.BSSID(cache.wifi_bssid);
                     cache.wifi_channel = WiFi.channel();
                     cache.m_crc        = 0;
                     cache.m_crc        = neeprom::crc32((const byte*)&cache, sizeof(nwifi::cache_t));
@@ -152,6 +147,41 @@ namespace ncore
             state->wifi->m_status = nstatus::Disconnected;
         }
 
+        void print_connection_info(state_t* state)
+        {
+            ncore::nserial::println("WiFi Connection Info:");
+
+#ifdef TARGET_ESP8266
+            // Print PhyMode
+            if (WiFi.getPhyMode() == WIFI_PHY_MODE_11B)
+            {
+                ncore::nserial::println(" PhyMode: 802.11b");
+            }
+            else if (WiFi.getPhyMode() == WIFI_PHY_MODE_11G)
+            {
+                ncore::nserial::println(" PhyMode: 802.11g");
+            }
+            else if (WiFi.getPhyMode() == WIFI_PHY_MODE_11N)
+            {
+                ncore::nserial::println(" PhyMode: 802.11n");
+            }
+            else
+            {
+                ncore::nserial::println(" PhyMode: Unknown");
+            }
+#endif
+
+            ncore::nserial::print(" SSID: ");
+            ncore::nserial::println(state->WiFiSSID);
+            ncore::nserial::print(" MAC Address: ");
+            MACAddress_t mac = state->wifi->m_mac;
+            ncore::nserial::print(mac);
+            ncore::nserial::println("");
+            IPAddress ip = WiFi.localIP();
+            ncore::nserial::printf("  IP Address: %d.%d.%d.%d\n", va_t(ip[0]), va_t(ip[1]), va_t(ip[2]), va_t(ip[3]));
+            ncore::nserial::printf(" RSSI: %d dBm\n", va_t(WiFi.RSSI()));
+        }
+
     }  // namespace nwifi
 }  // namespace ncore
 
@@ -163,49 +193,12 @@ namespace ncore
 {
     namespace nwifi
     {
-        // WiFi mock
+        void init_state(state_t* state) {}
+        void connect(state_t* state) {}
+        bool connected(state_t* state) { return false; }
+        void disconnect(state_t* state) {}
 
-        const s32 MaxSocketNum = 4096;
-
-        BSID_t            CurrentBSSID              = {0, 0, 0, 0, 0, 0, 0, 0};
-        IPAddress_t       CurrentDNS                = {0, 0, 0, 0};
-        IPAddress_t       CurrentGateway            = {127, 0, 0, 255};
-        IPAddress_t       CurrentLocalIP            = {127, 0, 0, 1};
-        s32               CurrentNetworks           = 0;
-        s32               CurrentRSSI               = -1;
-        const char*       CurrentSSID               = "";
-        nstatus::status_t CurrentStatus             = nstatus::Idle;
-        int               SocketPort[MaxSocketNum]  = {0};
-        int               SocketState[MaxSocketNum] = {0};
-
-        bool set_mode_AP() { return true; }
-        bool set_mode_STA() { return true; }
-        bool set_mode_AP_STA() { return true; }
-
-        nstatus::status_t begin(const char* ssid)
-        {
-            CurrentRSSI   = 0;
-            CurrentSSID   = ssid;
-            CurrentStatus = nstatus::Connected;
-            return CurrentStatus;
-        }
-
-        nstatus::status_t begin_encrypted(const char* ssid, const char* passphrase)
-        {
-            CurrentRSSI   = 0;
-            CurrentSSID   = ssid;
-            CurrentStatus = nstatus::Connected;
-            return CurrentStatus;
-        }
-
-        void              disconnect() { CurrentStatus = nstatus::Idle; }
-        IPAddress_t       local_IP() { return CurrentLocalIP; }
-        MACAddress_t      mac_address() { return MACAddress_t{0, 0, 0, 0, 0, 0}; }
-        int               get_RSSI() { return CurrentRSSI; }
-        void              set_DNS(const IPAddress_t& dns) { CurrentDNS = dns; }
-        nstatus::status_t status() { return CurrentStatus; }
-        const char*       status_str(nstatus::status_t status) { return "Simulated"; }
-        bool              reconnect() { return true; }
+        void print_connection_info(state_t* state) {}
 
     }  // namespace nwifi
 }  // namespace ncore

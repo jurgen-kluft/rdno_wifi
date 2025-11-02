@@ -19,12 +19,6 @@ namespace ncore
         typedef void* client_t;
     }
 
-    namespace nudp
-    {
-        struct udp_sock_t;
-        typedef udp_sock_t* sock_t;
-    }  // namespace nudp
-
     namespace nwifi
     {
         // @see: https://www.arduino.cc/en/Reference/WiFi
@@ -53,6 +47,7 @@ namespace ncore
             u32 ip_dns2;
             u16 wifi_channel;
             u8  wifi_bssid[6];
+            void reset();
         };
 
         struct BSID_t

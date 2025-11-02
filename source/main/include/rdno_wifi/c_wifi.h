@@ -13,11 +13,14 @@ namespace ncore
 {
     namespace nwifi
     {
-        void init_state(state_t* state);
+        void init_state(state_t* state, bool load_cache);
 
         void connect(state_t* state);
         bool connected(state_t* state);
         void disconnect(state_t* state);
+        s32 get_RSSI(state_t* state);
+
+        void print_connection_info(state_t* state);
 
     }  // namespace nwifi
 }  // namespace ncore
