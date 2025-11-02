@@ -91,7 +91,7 @@ namespace ncore
                 const u16 remote_port = state->ServerTcpPort;
 
 #    ifdef TARGET_DEBUG
-                nserial::printf("Connecting to %d.%d.%d.%d:%d ...\n", va_t(remote_server_ip_address.m_address[0]), va_t(remote_server_ip_address.m_address[1]), va_t(remote_server_ip_address.m_address[2]), va_t(remote_server_ip_address.m_address[3]),
+                nserial::printf("Connecting to %d.%d.%d.%d:%d ...\n", va_t(remote_server_ip_address.at(0)), va_t(remote_server_ip_address.at(1)), va_t(remote_server_ip_address.at(2)), va_t(remote_server_ip_address.at(3)),
                                 va_t(remote_port));
 #    endif
                 state->node->tcp_client = ntcp::connect(state->tcp, remote_server_ip_address, remote_port, 8000);
