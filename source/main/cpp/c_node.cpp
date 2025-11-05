@@ -38,7 +38,6 @@ namespace ncore
 
         ntask::result_t func_connect_to_WiFi_start(state_t* state)
         {
-            nserial::printf("Connecting to WiFi with SSID %s ...\n", va_t(state->WiFiSSID));
             nwifi::connect(state);
             return ntask::RESULT_DONE;
         }

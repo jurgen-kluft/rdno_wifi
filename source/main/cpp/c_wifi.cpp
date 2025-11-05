@@ -93,22 +93,23 @@ namespace ncore
         }
 
         // do a normal wifi connection, once connected cache connection info, return true if ok
-        void fast_connect_normal(const char* ssid, const char* auth) { WiFi.begin(ssid, auth, 0, NULL, true); }
+        void fast_connect_normal(const char* ssid, const char* auth) { WiFi.begin(ssid, auth); }
 
         // Connect to wifi as specified, returns true if ok
         void connect(state_t* state)
         {
             WiFi.setAutoReconnect(false);  // prevent early autoconnect
+            WiFi.persistent(true);
+            WiFi.mode(WIFI_STA);
+
             if (state->wifi->m_cache.ip_address == 0)
             {
-                WiFi.persistent(false);
-                WiFi.mode(WIFI_STA);
+                nserial::printf("Connect (normal) to WiFi with SSID %s ...\n", va_t(state->WiFiSSID));
                 fast_connect_normal(state->WiFiSSID, state->WiFiPassword);
             }
             else
             {
-                WiFi.persistent(true);
-                WiFi.mode(WIFI_STA);
+                nserial::printf("Connect (fast) to WiFi with SSID %s ...\n", va_t(state->WiFiSSID));
                 fast_connect_fast(state->WiFiSSID, state->WiFiPassword, state->wifi->m_cache);
             }
         }
@@ -151,7 +152,7 @@ namespace ncore
         {
             ncore::nserial::println("WiFi Connection Info:");
 
-#ifdef TARGET_ESP8266
+#    ifdef TARGET_ESP8266
             // Print PhyMode
             if (WiFi.getPhyMode() == WIFI_PHY_MODE_11B)
             {
@@ -169,7 +170,7 @@ namespace ncore
             {
                 ncore::nserial::println(" PhyMode: Unknown");
             }
-#endif
+#    endif
 
             ncore::nserial::print(" SSID: ");
             ncore::nserial::println(state->WiFiSSID);
