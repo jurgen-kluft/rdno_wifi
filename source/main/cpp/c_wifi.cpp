@@ -9,10 +9,10 @@
 
 #    include "rdno_wifi/c_wifi.h"
 #    include "rdno_core/c_eeprom.h"
-#    include "rdno_core/c_memory.h"
 #    include "rdno_core/c_network.h"
 #    include "rdno_core/c_serial.h"
 #    include "rdno_core/c_str.h"
+#    include "ccore/c_memory.h"
 
 namespace ncore
 {

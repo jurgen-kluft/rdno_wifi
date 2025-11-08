@@ -1,8 +1,8 @@
 #include "rdno_core/c_state.h"
 #include "rdno_core/c_str.h"
 #include "rdno_core/c_malloc.h"
-#include "rdno_core/c_memory.h"
 #include "rdno_wifi/c_tcp.h"
+#include "ccore/c_memory.h"
 
 #ifdef TARGET_ARDUINO
 
