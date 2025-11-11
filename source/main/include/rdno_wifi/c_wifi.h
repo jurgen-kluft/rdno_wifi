@@ -15,7 +15,7 @@ namespace ncore
     {
         void init_state(state_t* state, bool load_cache);
 
-        void connect(state_t* state);
+        void connect(state_t* state, bool force_normal_mode = false);
         bool connected(state_t* state);
         void disconnect(state_t* state);
         s32 get_RSSI(state_t* state);

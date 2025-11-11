@@ -221,7 +221,7 @@ namespace ncore
 
         void initialize(state_t* state, state_task_t* task_state)
         {
-            nwifi::init_state(state, false);
+            nwifi::init_state(state, true);
             ntcp::init_state(state);
             nudp::init_state(state);
 

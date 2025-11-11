@@ -96,13 +96,13 @@ namespace ncore
         void fast_connect_normal(const char* ssid, const char* auth) { WiFi.begin(ssid, auth); }
 
         // Connect to wifi as specified, returns true if ok
-        void connect(state_t* state)
+        void connect(state_t* state, bool force_normal_mode)
         {
             WiFi.setAutoReconnect(false);  // prevent early autoconnect
             WiFi.persistent(true);
             WiFi.mode(WIFI_STA);
 
-            if (state->wifi->m_cache.ip_address == 0)
+            if (state->wifi->m_cache.ip_address == 0 || force_normal_mode)
             {
                 nserial::printf("Connect (normal) to WiFi with SSID %s ...\n", va_t(state->WiFiSSID));
                 fast_connect_normal(state->WiFiSSID, state->WiFiPassword);
