@@ -1,6 +1,8 @@
 #ifdef TARGET_ARDUINO
 
 #    include "Arduino.h"
+
+#    include "rdno_wifi/c_ethernet.h"
 #    include "WiFi.h"
 
 #    include "rdno_core/c_app.h"
@@ -85,13 +87,11 @@ namespace ncore
         {
             if (state->node->remote_mode == 0)
             {
-                IPAddress_t remote_server_ip_address;
-                remote_server_ip_address.from(state->ServerIP);
+                IPAddress_t remote_server_ip_address = IPAddress_t::from(state->ServerIP);
                 const u16 remote_port = state->ServerTcpPort;
 
 #    ifdef TARGET_DEBUG
-                nserial::printf("Connecting to %d.%d.%d.%d:%d ...\n", va_t(remote_server_ip_address.at(0)), va_t(remote_server_ip_address.at(1)), va_t(remote_server_ip_address.at(2)), va_t(remote_server_ip_address.at(3)),
-                                va_t(remote_port));
+                nserial::printf("Connecting to %d.%d.%d.%d:%d ...\n", va_t(remote_server_ip_address[0]), va_t(remote_server_ip_address[1]), va_t(remote_server_ip_address[2]), va_t(remote_server_ip_address[3]), va_t(remote_port));
 #    endif
                 state->node->tcp_client = ntcp::connect(state->tcp, remote_server_ip_address, remote_port, 8000);
                 if (ntcp::connected(state->tcp, state->node->tcp_client))
@@ -244,11 +244,9 @@ namespace ncore
             }
             else
             {
-                IPAddress_t remote_server_ip;
-                remote_server_ip.from(state->ServerIP);
+                IPAddress_t remote_server_ip = IPAddress_t::from(state->ServerIP);
                 const u16 remote_port = state->ServerUdpPort;
-
-                nudp::send_to(state, data, size, remote_server_ip, remote_port);
+                nudp::send_to(state, 31337, data, size, remote_server_ip, remote_port);
             }
         }
 

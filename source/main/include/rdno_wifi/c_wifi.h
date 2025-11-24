@@ -18,7 +18,10 @@ namespace ncore
         void connect(state_t* state, bool force_normal_mode = false);
         bool connected(state_t* state);
         void disconnect(state_t* state);
-        s32 get_RSSI(state_t* state);
+
+        IPAddress_t  get_IP(state_t* state);
+        MACAddress_t get_MAC(state_t* state);
+        s32          get_RSSI(state_t* state);
 
         void print_connection_info(state_t* state);
 

@@ -8,6 +8,9 @@
 
 #    include "Arduino.h"
 
+#    include "rdno_wifi/c_ethernet.h"
+#    include "WiFi.h"
+
 #    include "WiFiServer.h"
 #    include "WiFiClient.h"
 
@@ -26,7 +29,7 @@ namespace ncore
         void init_state(state_t* state)
         {
             gTcpState.m_NumClients = 0;
-            state->tcp = &gTcpState;
+            state->tcp             = &gTcpState;
         }
 
 #    ifdef TARGET_ESP32
@@ -76,20 +79,16 @@ namespace ncore
 
         IPAddress_t remote_IP(state_tcp_t* state, client_t client)
         {
-            IPAddress   ip = state->m_WiFiClient.remoteIP();
-            IPAddress_t rip;
-            rip.from(ip[0], ip[1], ip[2], ip[3]);
-            return rip;
+            IPAddress ip = state->m_WiFiClient.remoteIP();
+            return IPAddress_t::from(ip[0], ip[1], ip[2], ip[3]);
         }
 
         u16 remote_port(state_tcp_t* state, client_t client) { return state->m_WiFiClient.remotePort(); }
 
         IPAddress_t local_IP(state_tcp_t* state, client_t client)
         {
-            IPAddress   ip = state->m_WiFiClient.localIP();
-            IPAddress_t lip;
-            lip.from(ip[0], ip[1], ip[2], ip[3]);
-            return lip;
+            IPAddress ip = state->m_WiFiClient.localIP();
+            return IPAddress_t::from(ip[0], ip[1], ip[2], ip[3]);
         }
 
         u16 local_port(state_tcp_t* state, client_t client) { return state->m_WiFiClient.localPort(); }

@@ -1,6 +1,8 @@
 #ifdef TARGET_ARDUINO
 
 #    include "Arduino.h"
+
+#    include "rdno_wifi/c_ethernet.h"
 #    include "WiFi.h"
 
 #    ifdef TARGET_ESP8266
@@ -55,19 +57,17 @@ namespace ncore
         void disconnect() { WiFi.disconnect(); }
         void disconnect_AP(bool wifioff) { WiFi.softAPdisconnect(wifioff); }
 
-        IPAddress_t local_IP()
+        IPAddress_t get_IP(state_t* state)
         {
             IPAddress   ip = WiFi.localIP();
-            IPAddress_t ipAddr;
-            ipAddr.from(ip[0], ip[1], ip[2], ip[3]);
-            return ipAddr;
+            return IPAddress_t::from(ip[0], ip[1], ip[2], ip[3]);
         }
 
-        MACAddress_t mac_address()
+        MACAddress_t get_MAC(state_t* state)
         {
-            MACAddress_t macAddress;
-            uint8_t*     mac = WiFi.macAddress(&macAddress.m_address[0]);
-            return macAddress;
+            MACAddress_t mac;
+            WiFi.macAddress(mac.m_address);
+            return mac;
         }
 
         s32 get_RSSI(state_t* state) { return WiFi.RSSI(); }
@@ -194,12 +194,34 @@ namespace ncore
 {
     namespace nwifi
     {
-        void init_state(state_t* state) {}
-        void connect(state_t* state) {}
-        bool connected(state_t* state) { return false; }
-        void disconnect(state_t* state) {}
+        void init_state(state_t* state) { CC_UNUSED(state); }
+        void connect(state_t* state) { CC_UNUSED(state); }
+        bool connected(state_t* state)
+        {
+            CC_UNUSED(state);
+            return false;
+        }
+        void disconnect(state_t* state) { CC_UNUSED(state); }
 
-        void print_connection_info(state_t* state) {}
+        void get_IP(state_t* state, IPAddress_t& ip_address)
+        {
+            CC_UNUSED(state);
+            CC_UNUSED(ip_address);
+        }
+
+        void get_MAC(state_t* state, MACAddress_t& mac_address)
+        {
+            CC_UNUSED(state);
+            CC_UNUSED(mac_address);
+        }
+
+        s32 get_RSSI(state_t* state)
+        {
+            CC_UNUSED(state);
+            return 0;
+        }
+
+        void print_connection_info(state_t* state) { CC_UNUSED(state); }
 
     }  // namespace nwifi
 }  // namespace ncore
